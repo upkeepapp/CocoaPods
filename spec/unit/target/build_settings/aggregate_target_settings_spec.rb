@@ -13,13 +13,18 @@ module Pod
         end
 
         before do
-          @target_definition = fixture_target_definition
+          project_path = SpecHelper.create_sample_app_copy_from_fixture('SampleProject')
+          @project = Xcodeproj::Project.open(project_path)
+          @project.save
+          @native_target = @project.targets.find { |t| t.name == 'SampleProject' }
+          @target_definition = fixture_target_definition('SampleProject')
           @specs = specs
           @specs.first.user_target_xcconfig = { 'OTHER_LDFLAGS' => '-no_compact_unwind', 'USE_HEADERMAP' => 'NO' } unless @specs.empty?
           @specs.first.pod_target_xcconfig = { 'CLANG_CXX_LANGUAGE_STANDARD' => 'c++11' } unless @specs.empty?
           @pod_targets = @specs.map { |spec| pod_target(spec, @target_definition) }
           @target = fixture_aggregate_target(@pod_targets, BuildType.static_library, { 'Release' => :release }, [],
-                                             Platform.new(:ios, '6.0'), @target_definition)
+                                             Platform.new(:ios, '6.0'), @target_definition, @project,
+                                             [@native_target.uuid])
           unless @specs.empty?
             @target.target_definition.whitelist_pod_for_configuration(@specs.first.name, 'Release')
           end
@@ -190,7 +195,7 @@ module Pod
             end
 
             it 'links the pod targets with the aggregate target' do
-              @xcconfig.to_hash['OTHER_LDFLAGS'].should.include '-l"BananaLib-Pods"'
+              @xcconfig.to_hash['OTHER_LDFLAGS'].should.include '-l"BananaLib-Pods-SampleProject"'
             end
           end
 
@@ -316,6 +321,46 @@ module Pod
               @target.stubs(:build_type => BuildType.static_library)
               @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) '@executable_path/Frameworks' '@loader_path/Frameworks'"
             end
+
+            it 'includes the xctunwrap fix for library targets with iOS deployment target < 12.2 and XCTest is linked' do
+              SpecHelper.create_sample_app_copy_from_fixture('SampleProject/Sample Lib')
+              project_path = File.join(temporary_directory, 'SampleProject', 'Sample Lib', 'Sample Lib.xcodeproj')
+              project = Xcodeproj::Project.open(project_path)
+              native_target = project.targets.find { |t| t.name == 'SampleFramework' }
+              native_target.build_configurations.each do |configuration|
+                configuration.build_settings['OTHER_LDFLAGS'] = '-framework "XCTest"'
+              end
+              project.save
+              target_definition = fixture_target_definition('SampleFramework')
+              pod_targets = specs.map { |spec| pod_target(spec, target_definition) }
+              target = fixture_aggregate_target(pod_targets, BuildType.static_library, { 'Release' => :release }, [],
+                                                Platform.new(:ios, '6.0'), target_definition, project,
+                                                [native_target.uuid])
+              generator = AggregateTargetSettings.new(target, 'Release', :configuration => :release)
+              hash = generator.generate.to_hash
+              hash['SYSTEM_FRAMEWORK_SEARCH_PATHS'].should.include '"$(PLATFORM_DIR)/Developer/usr/lib"'
+              hash['LIBRARY_SEARCH_PATHS'].should.include '"$(PLATFORM_DIR)/Developer/usr/lib"'
+              hash['SWIFT_INCLUDE_PATHS'].should.include '"$(PLATFORM_DIR)/Developer/usr/lib"'
+            end
+
+            it 'does not include xctunwrap fix for a library target with higher than 12.1 deployment target' do
+              SpecHelper.create_sample_app_copy_from_fixture('SampleProject/Sample Lib')
+              project_path = File.join(temporary_directory, 'SampleProject', 'Sample Lib', 'Sample Lib.xcodeproj')
+              project = Xcodeproj::Project.open(project_path)
+              project.save
+              native_target = project.targets.find { |t| t.name == 'SampleFramework' }
+              native_target.stubs(:deployment_target).returns('12.2')
+              target_definition = fixture_target_definition('SampleFramework')
+              pod_targets = specs.map { |spec| pod_target(spec, target_definition) }
+              target = fixture_aggregate_target(pod_targets, BuildType.static_library, { 'Release' => :release }, [],
+                                                Platform.new(:ios, '12.2'), target_definition, project,
+                                                [native_target.uuid])
+              generator = AggregateTargetSettings.new(target, 'Release', :configuration => :release)
+              hash = generator.generate.to_hash
+              hash['SYSTEM_FRAMEWORK_SEARCH_PATHS'].should.be.nil
+              hash['LIBRARY_SEARCH_PATHS'].should.not.include '"$(PLATFORM_DIR)/Developer/usr/lib"'
+              hash['SWIFT_INCLUDE_PATHS'].should.be.nil
+            end
           end
 
           describe 'with a scoped pod target' do
@@ -387,14 +432,16 @@ module Pod
 
           it 'includes correct default runpath search path list for OSX unit test bundle user target' do
             @target.stubs(:platform).returns(Platform.new(:osx, '10.10'))
-            mock_user_target = mock('usertarget', :symbol_type => :unit_test_bundle)
+            mock_user_target = mock('usertarget')
+            mock_user_target.stubs(:symbol_type).returns(:unit_test_bundle)
             @target.stubs(:user_targets).returns([mock_user_target])
             @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) '@executable_path/../Frameworks' '@loader_path/../Frameworks'"
           end
 
           it 'includes correct default runpath search path list for OSX application user target' do
             @target.stubs(:platform).returns(Platform.new(:osx, '10.10'))
-            mock_user_target = mock('usertarget', :symbol_type => :application)
+            mock_user_target = mock('usertarget')
+            mock_user_target.stubs(:symbol_type).returns(:application)
             @target.stubs(:user_targets).returns([mock_user_target])
             @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) '@executable_path/../Frameworks' '@loader_path/Frameworks'"
           end

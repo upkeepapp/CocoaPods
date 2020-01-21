@@ -14,6 +14,10 @@ To install release candidates run `[sudo] gem install cocoapods --pre`
 
 ##### Bug Fixes
 
+* Apply Xcode 11 `XCTUnwrap` fix for libraries and frameworks.  
+  [Dimitris Koutsogiorgas](https://github.com/dnkoutso)
+  [#9500](https://github.com/CocoaPods/CocoaPods/pull/9500)
+
 * Fix resources script when building a project from a symlink.  
   [Dimitris Koutsogiorgas](https://github.com/dnkoutso)
   [#9423](https://github.com/CocoaPods/CocoaPods/issues/9423)
