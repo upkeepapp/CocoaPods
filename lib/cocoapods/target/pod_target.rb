@@ -287,6 +287,13 @@ module Pod
       specs.map { |spec| spec.consumer(platform) }
     end
 
+    # @return [Array<Specification::Consumer>] the library specification consumers for
+    #         the target.
+    #
+    def library_spec_consumers
+      library_specs.map { |test_spec| test_spec.consumer(platform) }
+    end
+
     # @return [Array<Specification::Consumer>] the test specification consumers for
     #         the target.
     #

@@ -1000,8 +1000,13 @@ module Pod
 
         # @see BuildSettings#should_apply_xctunwrap_fix?
         def should_apply_xctunwrap_fix?
-          library_xcconfig? && Version.new(target.platform.deployment_target) < Version.new('12.2') &&
-            target.name.include?('Testing') || consumer_frameworks.include?('XCTest')
+          l = library_xcconfig?
+          v = Version.new(target.platform.deployment_target) < Version.new('12.2')
+          ting = target.name.include?('Testing')
+          f = target.library_spec_consumers.flat_map(&:frameworks).include?('XCTest')
+          x = l && v && ting || f
+          puts "=== #{x} for #{target.name} because: name? #{ting} or because framework? #{f}" if x
+          x
         end
 
         #-------------------------------------------------------------------------#
