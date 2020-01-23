@@ -1000,8 +1000,9 @@ module Pod
 
         # @see BuildSettings#should_apply_xctunwrap_fix?
         def should_apply_xctunwrap_fix?
-          library_xcconfig? && Version.new(target.platform.deployment_target) < Version.new('12.2') &&
-            consumer_frameworks.include?('XCTest')
+          true
+          # library_xcconfig? && Version.new(target.platform.deployment_target) < Version.new('12.2') &&
+          #   consumer_frameworks.include?('XCTest')
         end
 
         #-------------------------------------------------------------------------#
