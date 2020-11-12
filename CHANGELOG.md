@@ -32,6 +32,10 @@ To install release candidates run `[sudo] gem install cocoapods --pre`
   [cltnschlosser](https://github.com/cltnschlosser)
   [#9916](https://github.com/CocoaPods/CocoaPods/pull/9916)
 
+* Add possibility to skip modulemap generation
+  [till0xff](https://github.com/till0xff)
+  [#10235](https://github.com/CocoaPods/CocoaPods/issues/10235)
+
 ##### Bug Fixes
 
 * Do not add dependencies to 'Link Binary With Libraries' phase.  
