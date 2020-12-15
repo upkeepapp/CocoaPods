@@ -1,3 +1,5 @@
+require 'active_support/core_ext/array'
+require 'active_support/core_ext/string/inflections'
 require 'cocoapods/xcode'
 
 module Pod
@@ -14,11 +16,15 @@ module Pod
           #
           attr_reader :umbrella_header_paths
 
+          # @return [PodTarget] @see TargetInstaller#target
+          #
+          attr_reader :target
+
           # Initialize a new instance
           #
           # @param [Sandbox] sandbox @see TargetInstaller#sandbox
           # @param [Pod::Project] project @see TargetInstaller#project
-          # @param [Target] target @see TargetInstaller#target
+          # @param [PodTarget] target @see TargetInstaller#target
           # @param [Array<Pathname>] umbrella_header_paths @see #umbrella_header_paths
           #
           def initialize(sandbox, project, target, umbrella_header_paths = nil)
@@ -42,6 +48,8 @@ module Pod
                 # PBXAggregateTarget that will be used to wire up dependencies later.
                 native_target = add_placeholder_target
                 resource_bundle_targets = add_resources_bundle_targets(library_file_accessors).values.flatten
+                create_copy_dsyms_script
+                create_copy_xcframeworks_script unless target.xcframeworks.values.all?(&:empty?)
                 create_xcconfig_file(native_target, resource_bundle_targets)
                 return TargetInstallationResult.new(target, native_target, resource_bundle_targets)
               end
@@ -57,8 +65,10 @@ module Pod
               app_resource_bundle_targets = add_resources_bundle_targets(app_file_accessors)
 
               add_files_to_build_phases(native_target, test_native_targets, app_native_targets)
-              validate_targets_contain_sources(test_native_targets + app_native_targets + [native_target])
-              validate_xcframeworks_no_mixed_linkage
+              validate_targets_contain_sources(test_native_targets + app_native_targets.values + [native_target])
+              validate_xcframeworks
+
+              create_copy_xcframeworks_script unless target.xcframeworks.values.all?(&:empty?)
 
               create_xcconfig_file(native_target, resource_bundle_targets)
               create_test_xcconfig_files(test_native_targets, test_resource_bundle_targets)
@@ -120,12 +130,13 @@ module Pod
                 target.app_specs.each do |app_spec|
                   path = target.prefix_header_path_for_spec(app_spec)
                   app_spec_consumer = app_spec.consumer(target.platform)
-                  app_native_target = app_native_target_from_spec(app_spec_consumer.spec, app_native_targets)
+                  app_native_target = app_native_targets[app_spec_consumer.spec]
                   create_prefix_header(path, app_file_accessors, target.platform, app_native_target, project_directory)
                   add_file_to_support_group(path)
                 end
               end
               create_dummy_source(native_target)
+              create_copy_dsyms_script
               clean_support_files_temp_dir
               TargetInstallationResult.new(target, native_target, resource_bundle_targets,
                                            test_native_targets, test_resource_bundle_targets, test_app_host_targets,
@@ -177,7 +188,7 @@ module Pod
           # @return [Boolean] Whether the target should build a pch file.
           #
           def skip_pch?(specs)
-            specs.any? { |spec| spec.prefix_header_file.is_a?(FalseClass) }
+            specs.any? { |spec| spec.root.prefix_header_file.is_a?(FalseClass) }
           end
 
           def skip_modulemap?(specs)
@@ -220,7 +231,28 @@ module Pod
               settings['SWIFT_VERSION'] = target.swift_version
             end
 
+            if info_plist_bundle_id
+              settings['PRODUCT_BUNDLE_IDENTIFIER'] = info_plist_bundle_id
+            end
+
             settings
+          end
+
+          # @return [String] Bundle Identifier found in the custom Info.plist entries
+          #
+          def info_plist_bundle_id
+            return @plist_bundle_id if defined?(@plist_bundle_id)
+            unless target.info_plist_entries.nil?
+              @plist_bundle_id = target.info_plist_entries['CFBundleIdentifier']
+              unless @plist_bundle_id.nil?
+                message = "The `#{target.name}` target " \
+              "sets a Bundle Identifier of `#{@plist_bundle_id}` in it's info.plist file. " \
+              'The Bundle Identifier should be set using pod_target_xcconfig: ' \
+              "s.pod_target_xcconfig = { 'PRODUCT_BUNDLE_IDENTIFIER': '#{@plist_bundle_id}' }`."
+                UI.warn message
+              end
+              @plist_bundle_id
+            end
           end
 
           # Filters the given resource file references discarding empty paths which are
@@ -289,7 +321,7 @@ module Pod
                                when :test
                                  test_native_target_from_spec(consumer.spec, test_native_targets)
                                when :app
-                                 app_native_target_from_spec(consumer.spec, app_native_targets)
+                                 app_native_targets[consumer.spec]
                                end
 
               headers = file_accessor.headers
@@ -326,6 +358,11 @@ module Pod
 
               filter_resource_file_references(file_accessor.resources.flatten) do |compile_phase_refs, resource_phase_refs|
                 native_target.add_file_references(compile_phase_refs, nil)
+
+                if target.build_as_static_framework? && consumer.spec.library_specification?
+                  resource_phase_refs = resource_phase_refs.select { |ref| Target.resource_extension_compilable?(File.extname(ref.path)) }
+                end
+
                 native_target.add_resources(resource_phase_refs)
               end
             end
@@ -344,6 +381,7 @@ module Pod
               name = target.test_target_label(test_spec)
               platform_name = target.platform.name
               language = target.uses_swift_for_spec?(test_spec) ? :swift : :objc
+              embedded_content_contains_swift = target.dependent_targets_for_test_spec(test_spec).any?(&:uses_swift?)
               test_native_target = project.new_target(product_type, name, platform_name,
                                                       target.deployment_target_for_non_library_spec(test_spec), nil,
                                                       language)
@@ -375,13 +413,19 @@ module Pod
                   configuration.build_settings['CODE_SIGNING_ALLOWED'] = 'YES'
                 end
                 # For macOS we do not code sign the XCTest bundle because we do not code sign the frameworks either.
-                configuration.build_settings['CODE_SIGN_IDENTITY'] = '' if target.platform == :osx
+                if target.platform == :osx
+                  configuration.build_settings['CODE_SIGN_IDENTITY'] = ''
+                elsif target.platform == :ios
+                  configuration.build_settings['CODE_SIGN_IDENTITY'] = 'iPhone Developer'
+                end
+                # Ensure swift stdlib gets copied in if needed, even when the target contains no swift files,
+                # because a dependency uses swift
+                configuration.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES' if embedded_content_contains_swift
               end
 
               remove_pod_target_xcconfig_overrides_from_target(target.test_spec_build_settings_by_config[test_spec.name], test_native_target)
 
               # Test native targets also need frameworks and resources to be copied over to their xctest bundle.
-              create_test_target_prepare_artifacts_script(test_spec)
               create_test_target_embed_frameworks_script(test_spec)
               create_test_target_copy_resources_script(test_spec)
 
@@ -415,10 +459,10 @@ module Pod
           # Adds the app targets for the library to the Pods project with the
           # appropriate build configurations.
           #
-          # @return [Array<PBXNativeTarget>] the app native targets created.
+          # @return [Hash{Specification => PBXNativeTarget}] the app native targets created, keyed by their app spec
           #
           def add_app_targets
-            target.app_specs.map do |app_spec|
+            target.app_specs.each_with_object({}) do |app_spec, hash|
               spec_consumer = app_spec.consumer(target.platform)
               spec_name = app_spec.parent.name
               subspec_name = target.subspec_label(app_spec)
@@ -427,6 +471,7 @@ module Pod
               info_plist_entries = spec_consumer.info_plist
               resources = target.file_accessors.find { |fa| fa.spec == app_spec }.resources
               add_launchscreen_storyboard = resources.none? { |resource| resource.basename.to_s == 'LaunchScreen.storyboard' } && platform.name == :ios
+              embedded_content_contains_swift = target.dependent_targets_for_app_spec(app_spec).any?(&:uses_swift?)
               app_native_target = AppHostInstaller.new(sandbox, project, platform, subspec_name, spec_name,
                                                        app_target_label, :add_main => false,
                                                                          :add_launchscreen_storyboard => add_launchscreen_storyboard,
@@ -469,6 +514,9 @@ module Pod
                   configuration.build_settings.delete('CODE_SIGN_IDENTITY[sdk=iphoneos*]')
                   configuration.build_settings.delete('CODE_SIGN_IDENTITY[sdk=watchos*]')
                 end
+                # Ensure swift stdlib gets copied in if needed, even when the target contains no swift files,
+                # because a dependency uses swift
+                configuration.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES' if embedded_content_contains_swift
               end
 
               remove_pod_target_xcconfig_overrides_from_target(target.app_spec_build_settings_by_config[app_spec.name], app_native_target)
@@ -477,7 +525,7 @@ module Pod
               create_app_target_copy_resources_script(app_spec)
               add_resources_to_target(resources, app_native_target)
 
-              app_native_target
+              hash[app_spec] = app_native_target
             end
           end
 
@@ -619,10 +667,6 @@ module Pod
                 scoped_test_resource_bundle_targets = test_resource_bundle_targets[test_spec.name]
                 apply_xcconfig_file_ref_to_targets([test_native_target] + scoped_test_resource_bundle_targets, test_xcconfig_file_ref, names)
               end
-
-              test_native_target.build_configurations.each do |test_native_target_bc|
-                test_target_swift_debug_hack(test_spec, test_native_target_bc)
-              end
             end
           end
 
@@ -653,33 +697,6 @@ module Pod
             end
           end
 
-          # Creates a script that prepares artifacts for the test target.
-          #
-          # @param [Specification] test_spec
-          #        The test spec to create the script for.
-          #
-          # @return [void]
-          #
-          def create_test_target_prepare_artifacts_script(test_spec)
-            path = target.prepare_artifacts_script_path_for_spec(test_spec)
-            host_target_spec_names = target.app_host_dependent_targets_for_spec(test_spec).flat_map do |pt|
-              pt.specs.map(&:name)
-            end.uniq
-            frameworks_by_config = target.user_build_configurations.each_with_object({}) do |(config_name, config), paths_by_config|
-              paths_by_config[config_name] = target.dependent_targets_for_test_spec(test_spec, :configuration => config).flat_map do |pod_target|
-                spec_paths_to_include = pod_target.library_specs.map(&:name)
-                spec_paths_to_include -= host_target_spec_names
-                spec_paths_to_include << test_spec.name if pod_target == target
-                pod_target.xcframeworks.values_at(*spec_paths_to_include).flatten.compact.uniq
-              end
-            end
-            unless frameworks_by_config.each_value.all?(&:empty?)
-              generator = Generator::PrepareArtifactsScript.new(frameworks_by_config, target.sandbox.root, target.platform)
-              update_changed_file(generator, path)
-              add_file_to_support_group(path)
-            end
-          end
-
           # Creates a script that embeds the frameworks to the bundle of the test target.
           #
           # @param [Specification] test_spec
@@ -700,8 +717,16 @@ module Pod
                 pod_target.framework_paths.values_at(*spec_paths_to_include).flatten.compact.uniq
               end
             end
-            unless framework_paths_by_config.each_value.all?(&:empty?)
-              generator = Generator::EmbedFrameworksScript.new(framework_paths_by_config)
+            xcframeworks_by_config = target.user_build_configurations.each_with_object({}) do |(config_name, config), paths_by_config|
+              paths_by_config[config_name] = target.dependent_targets_for_test_spec(test_spec, :configuration => config).flat_map do |pod_target|
+                spec_paths_to_include = pod_target.library_specs.map(&:name)
+                spec_paths_to_include -= host_target_spec_names
+                spec_paths_to_include << test_spec.name if pod_target == target
+                pod_target.xcframeworks.values_at(*spec_paths_to_include).flatten.compact.uniq
+              end
+            end
+            unless framework_paths_by_config.each_value.all?(&:empty?) && xcframeworks_by_config.each_value.all?(&:empty?)
+              generator = Generator::EmbedFrameworksScript.new(framework_paths_by_config, xcframeworks_by_config)
               update_changed_file(generator, path)
               add_file_to_support_group(path)
             end
@@ -709,8 +734,8 @@ module Pod
 
           # Generates the contents of the xcconfig file used for each app target type and saves it to disk.
           #
-          # @param  [Array<PBXNativeTarget>] app_native_targets
-          #         the app native target to link the xcconfig file into.
+          # @param  [Hash{Specification => PBXNativeTarget}] app_native_targets
+          #         the app native targets to link the xcconfig file into.
           #
           # @param  [Hash{String=>Array<PBXNativeTarget>}] app_resource_bundle_targets
           #         the additional app resource bundle targets to link the xcconfig file into.
@@ -720,7 +745,7 @@ module Pod
           def create_app_xcconfig_files(app_native_targets, app_resource_bundle_targets)
             target.app_specs.each do |app_spec|
               spec_consumer = app_spec.consumer(target.platform)
-              app_native_target = app_native_target_from_spec(spec_consumer.spec, app_native_targets)
+              app_native_target = app_native_targets[spec_consumer.spec]
 
               target.user_config_names_by_config_type.each do |config, names|
                 path = target.xcconfig_path("#{target.subspec_label(app_spec)}.#{config}")
@@ -769,30 +794,55 @@ module Pod
           def create_app_target_embed_frameworks_script(app_spec)
             path = target.embed_frameworks_script_path_for_spec(app_spec)
             framework_paths_by_config = target.user_build_configurations.each_with_object({}) do |(config_name, config), paths_by_config|
-              pod_targets = target.dependent_targets_for_app_spec(app_spec, :configuration => config)
-              paths_by_config[config_name] = pod_targets.flat_map do |pod_target|
+              paths_by_config[config_name] = target.dependent_targets_for_app_spec(app_spec, :configuration => config).flat_map do |pod_target|
                 spec_paths_to_include = pod_target.library_specs.map(&:name)
                 spec_paths_to_include << app_spec.name if pod_target == target
                 pod_target.framework_paths.values_at(*spec_paths_to_include).flatten.compact.uniq
               end
             end
-            unless framework_paths_by_config.each_value.all?(&:empty?)
-              generator = Generator::EmbedFrameworksScript.new(framework_paths_by_config)
+            xcframeworks_by_config = target.user_build_configurations.each_with_object({}) do |(config_name, config), paths_by_config|
+              paths_by_config[config_name] = target.dependent_targets_for_app_spec(app_spec, :configuration => config).flat_map do |pod_target|
+                spec_paths_to_include = pod_target.library_specs.map(&:name)
+                spec_paths_to_include << app_spec.name if pod_target == target
+                pod_target.xcframeworks.values_at(*spec_paths_to_include).flatten.compact.uniq
+              end
+            end
+
+            unless framework_paths_by_config.each_value.all?(&:empty?) && xcframeworks_by_config.each_value.all?(&:empty?)
+              generator = Generator::EmbedFrameworksScript.new(framework_paths_by_config, xcframeworks_by_config)
               update_changed_file(generator, path)
               add_file_to_support_group(path)
             end
           end
 
-          # Manually add `libswiftSwiftOnoneSupport.dylib` as it seems there is an issue with tests that do not include it for Debug configurations.
-          # Possibly related to Swift module optimization.
+          # Creates a script that copies and strips vendored dSYMs and bcsymbolmaps.
           #
           # @return [void]
           #
-          def test_target_swift_debug_hack(test_spec, test_target_bc)
-            return unless test_target_bc.debug?
-            return unless target.dependent_targets_for_test_spec(test_spec).any?(&:uses_swift?)
-            ldflags = test_target_bc.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
-            ldflags << ' -lswiftSwiftOnoneSupport'
+          def create_copy_dsyms_script
+            dsym_paths = PodTargetInstaller.dsym_paths(target)
+            bcsymbolmap_paths = PodTargetInstaller.bcsymbolmap_paths(target)
+            path = target.copy_dsyms_script_path
+            unless dsym_paths.empty? && bcsymbolmap_paths.empty?
+              generator = Generator::CopydSYMsScript.new(dsym_paths, bcsymbolmap_paths)
+              update_changed_file(generator, path)
+              add_file_to_support_group(path)
+            end
+          end
+
+          # Creates a script that copies the appropriate xcframework slice to the build dir.
+          #
+          # @note   We can't use Xcode default link libraries phase, because
+          #         we need to ensure that we only copy the frameworks which are
+          #         relevant for the current build configuration.
+          #
+          # @return [void]
+          #
+          def create_copy_xcframeworks_script
+            path = target.copy_xcframeworks_script_path
+            generator = Generator::CopyXCFrameworksScript.new(target.xcframeworks.values.flatten, sandbox.root, target.platform)
+            update_changed_file(generator, path)
+            add_file_to_support_group(path)
           end
 
           # Creates a build phase which links the versioned header folders
@@ -947,9 +997,18 @@ module Pod
           end
 
           def project_file_references_array(files, file_type)
+            error_message_for_missing_reference = lambda do |sf, target|
+              "Unable to find #{file_type} ref for `#{sf.basename}` for target `#{target.name}`."
+            end
             files.map do |sf|
-              project.reference_for_path(sf).tap do |ref|
-                raise Informative, "Unable to find #{file_type} ref for `#{sf.basename}` for target `#{target.name}`." unless ref
+              begin
+                project.reference_for_path(sf).tap do |ref|
+                  raise Informative, error_message_for_missing_reference.call(sf, target) unless ref
+                end
+              rescue Errno::ENOENT
+                # Normalize the error for Ruby < 2.7. Ruby 2.7 can crash on a different call of real path compared
+                # to older versions. This ensures that the error message is consistent.
+                raise Informative, error_message_for_missing_reference.call(sf, target)
               end
             end
           end
@@ -1012,13 +1071,6 @@ module Pod
             test_target_label = target.test_target_label(spec)
             test_native_targets.find do |test_native_target|
               test_native_target.name == test_target_label
-            end
-          end
-
-          def app_native_target_from_spec(spec, app_native_targets)
-            app_target_label = target.app_target_label(spec)
-            app_native_targets.find do |app_native_target|
-              app_native_target.name == app_target_label
             end
           end
 
@@ -1090,19 +1142,80 @@ module Pod
             end
           end
 
-          # Raises if a vendored xcframework contains frameworks of mixed linkage
+          # Raises if a vendored xcframework contains frameworks of mixed linkage or mixed packaging
           #
-          def validate_xcframeworks_no_mixed_linkage
+          def validate_xcframeworks
             target.xcframeworks.each_value do |xcframeworks|
               xcframeworks.each do |xcframework|
-                dynamic_slices, static_slices = xcframework.slices.partition { |slice| Pod::Xcode::LinkageAnalyzer.dynamic_binary?(slice.path) }
+                if xcframework.slices.empty?
+                  raise Informative, "Unable to install vendored xcframework `#{xcframework.name}` for Pod `#{target.label}` because it does not contain any binaries."
+                end
+                if xcframework.build_type.dynamic_library?
+                  raise Informative, <<-MSG.strip_heredoc
+                    Unable to install vendored xcframework `#{xcframework.name}` for Pod `#{target.label}` because it contains dynamic libraries which are not supported.
+                    Use dynamic frameworks for dynamic linking instead.
+                  MSG
+                end
+                if xcframework.build_type.static_library?
+                  binary_names = xcframework.slices.map { |slice| File.basename(slice.binary_path, File.extname(slice.binary_path)) }.uniq
+                  if binary_names.size > 1
+                    raise Informative, <<-MSG.strip_heredoc
+                      Unable to install vendored xcframework `#{xcframework.name}` for Pod `#{target.label}` because it contains static libraries
+                      with differing binary names: #{binary_names.to_sentence}.
+                    MSG
+                  end
+                end
+                dynamic_slices, static_slices = xcframework.slices.partition(&:dynamic?)
                 if !dynamic_slices.empty? && !static_slices.empty?
                   raise Informative, "Unable to install vendored xcframework `#{xcframework.name}` for Pod `#{target.label}`, because it contains both static and dynamic frameworks."
+                end
+                library_slices, framework_slices = xcframework.slices.partition(&:library?)
+                if !library_slices.empty? && !framework_slices.empty?
+                  raise Informative, "Unable to install vendored xcframework `#{xcframework.name}` for Pod `#{target.label}`, because it contains both libraries and frameworks."
                 end
               end
             end
           end
+
           #-----------------------------------------------------------------------#
+
+          class << self
+            # @param [PodTarget] target the target to be installed
+            #
+            # @return [Array<String>] the dSYM paths for the given target
+            #
+            def dsym_paths(target)
+              dsym_paths = target.framework_paths.values.flatten.reject { |fmwk_path| fmwk_path.dsym_path.nil? }.map(&:dsym_path)
+              dsym_paths.concat(target.xcframeworks.values.flatten.flat_map { |xcframework| xcframework_dsyms(xcframework.path) })
+              dsym_paths
+            end
+
+            # @param [PodTarget] target the target to be installed
+            #
+            # @return [Array<String>] the bcsymbolmap paths for the given target
+            #
+            def bcsymbolmap_paths(target)
+              target.framework_paths.values.flatten.reject do |fmwk_path|
+                fmwk_path.bcsymbolmap_paths.nil?
+              end.flat_map(&:bcsymbolmap_paths)
+            end
+
+            # @param  [Pathname] xcframework_path
+            #         the base path of the .xcframework bundle
+            #
+            # @return [Array<Pathname>] all found .dSYM paths
+            #
+            def xcframework_dsyms(xcframework_path)
+              basename = File.basename(xcframework_path, '.xcframework')
+              dsym_basename = basename + '.dSYMs'
+              path = xcframework_path.dirname + dsym_basename
+              if File.directory?(path)
+                Dir.glob(path + '*.dSYM')
+              else
+                []
+              end
+            end
+          end
         end
       end
     end

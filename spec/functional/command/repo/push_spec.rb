@@ -73,7 +73,7 @@ module Pod
         `git remote add origin #{@upstream}`
         `git remote -v`
         `git fetch -q`
-        `git branch --set-upstream-to=origin/master master`
+        `git branch --set-upstream-to=origin/main main`
       end
 
       # prepare the spec
@@ -156,7 +156,7 @@ module Pod
       Dir.chdir(@upstream) { `git checkout -b tmp_for_push -q` }
       cmd.expects(:validate_podspec_files).returns(true)
       Dir.chdir(temporary_directory) { cmd.run }
-      Dir.chdir(@upstream) { `git checkout master -q` }
+      Dir.chdir(@upstream) { `git checkout main -q` }
       (@upstream + 'PushTest/1.4/PushTest.podspec').read.should.include('PushTest')
     end
 
@@ -165,7 +165,7 @@ module Pod
       Dir.chdir(@upstream) { `git checkout -b tmp_for_push -q` }
       cmd.expects(:validate_podspec_files).returns(true)
       Dir.chdir(temporary_directory) { cmd.run }
-      Dir.chdir(@upstream) { `git checkout master -q` }
+      Dir.chdir(@upstream) { `git checkout main -q` }
       (@upstream + 'PushTest/1.4/PushTest.podspec').read.should.include('PushTest')
     end
 
@@ -174,13 +174,23 @@ module Pod
       Dir.chdir(@upstream) { `git checkout -b tmp_for_push -q` }
       cmd.expects(:validate_podspec_files).returns(true)
       Dir.chdir(temporary_directory) { cmd.run }
-      Dir.chdir(@upstream) { `git checkout master -q` }
+      Dir.chdir(@upstream) { `git checkout main -q` }
       (@upstream + 'PushTest/1.4/PushTest.podspec.json').read.should.include('PushTest')
+    end
+
+    it 'successfully pushes a spec with flag update-sources' do
+      cmd = command('repo', 'push', 'master', '--update-sources')
+      Dir.chdir(@upstream) { `git checkout -b tmp_for_push -q` }
+      cmd.expects(:validate_podspec_files).returns(true)
+      cmd.expects(:update_sources)
+      Dir.chdir(temporary_directory) { cmd.run }
+      Dir.chdir(@upstream) { `git checkout main -q` }
+      cmd.instance_variable_get(:@update_sources).should.equal true
     end
 
     it 'initializes with default sources if no custom sources specified' do
       cmd = command('repo', 'push', 'master')
-      cmd.instance_variable_get(:@source_urls).should.equal [@upstream.to_s]
+      cmd.instance_variable_get(:@source_urls).should.equal [@upstream.to_s, Pod::TrunkSource::TRUNK_REPO_URL]
     end
 
     it 'initializes with custom sources if specified' do
@@ -204,10 +214,10 @@ module Pod
     end
 
     it 'validates specs as frameworks by default' do
-      Validator.any_instance.expects(:podfile_from_spec).with(:ios, '8.0', true, [], false).times(3).returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:osx, nil, true, [], false).twice.returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:watchos, nil, true, [], false).twice.returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:tvos, nil, true, [], false).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:ios, '8.0', true, [], false, nil).times(3).returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:osx, nil, true, [], false, nil).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:watchos, nil, true, [], false, nil).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:tvos, nil, true, [], false, nil).twice.returns(stub('Podfile'))
 
       cmd = command('repo', 'push', 'master')
       # Git push will throw an exception here since this is a local custom git repo. All we care is the validator
@@ -218,10 +228,10 @@ module Pod
     end
 
     it 'validates specs as libraries if requested' do
-      Validator.any_instance.expects(:podfile_from_spec).with(:ios, nil, false, [], false).times(3).returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:osx, nil, false, [], false).twice.returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:watchos, nil, false, [], false).twice.returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:tvos, nil, false, [], false).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:ios, nil, false, [], false, nil).times(3).returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:osx, nil, false, [], false, nil).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:watchos, nil, false, [], false, nil).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:tvos, nil, false, [], false, nil).twice.returns(stub('Podfile'))
 
       cmd = command('repo', 'push', 'master', '--use-libraries')
       # Git push will throw an exception here since this is a local custom git repo. All we care is the validator
@@ -232,10 +242,10 @@ module Pod
     end
 
     it 'validates specs with modular headers if requested' do
-      Validator.any_instance.expects(:podfile_from_spec).with(:ios, nil, false, [], true).times(3).returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:osx, nil, false, [], true).twice.returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:watchos, nil, false, [], true).twice.returns(stub('Podfile'))
-      Validator.any_instance.expects(:podfile_from_spec).with(:tvos, nil, false, [], true).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:ios, nil, false, [], true, nil).times(3).returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:osx, nil, false, [], true, nil).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:watchos, nil, false, [], true, nil).twice.returns(stub('Podfile'))
+      Validator.any_instance.expects(:podfile_from_spec).with(:tvos, nil, false, [], true, nil).twice.returns(stub('Podfile'))
 
       cmd = command('repo', 'push', 'master', '--use-libraries', '--use-modular-headers')
       # Git push will throw an exception here since this is a local custom git repo. All we care is the validator

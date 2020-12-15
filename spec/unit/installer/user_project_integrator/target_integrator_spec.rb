@@ -31,7 +31,6 @@ module Pod
         @phase_prefix = TargetIntegrator::BUILD_PHASE_PREFIX
         @user_phase_prefix = TargetIntegrator::USER_BUILD_PHASE_PREFIX
         @embed_framework_phase_name = @phase_prefix + TargetIntegrator::EMBED_FRAMEWORK_PHASE_NAME
-        @prepare_artifacts_phase_name = @phase_prefix + TargetIntegrator::PREPARE_ARTIFACTS_PHASE_NAME
         @copy_pods_resources_phase_name = @phase_prefix + TargetIntegrator::COPY_PODS_RESOURCES_PHASE_NAME
         @check_manifest_phase_name = @phase_prefix + TargetIntegrator::CHECK_MANIFEST_PHASE_NAME
         @user_script_phase_name = @user_phase_prefix + 'Custom Script'
@@ -164,6 +163,15 @@ module Pod
           @pod_bundle.stubs(:build_type => BuildType.dynamic_framework)
           target = @target_integrator.send(:native_targets).first
           target.stubs(:symbol_type).returns(:messages_application)
+          @target_integrator.integrate!
+          phase = target.shell_script_build_phases.find { |bp| bp.name == @embed_framework_phase_name }
+          phase.nil?.should == false
+        end
+
+        it 'adds an embed frameworks build phase if the target to integrate is an app clip' do
+          @pod_bundle.stubs(:build_type => BuildType.dynamic_framework)
+          target = @target_integrator.send(:native_targets).first
+          target.stubs(:symbol_type).returns(:application_on_demand_install_capable)
           @target_integrator.integrate!
           phase = target.shell_script_build_phases.find { |bp| bp.name == @embed_framework_phase_name }
           phase.nil?.should == false
@@ -456,19 +464,15 @@ module Pod
           @target_integrator.integrate!
           target = @target_integrator.send(:native_targets).first
           phase = target.shell_script_build_phases.find { |bp| bp.name == @embed_framework_phase_name }
+          # dSYM and bcsymbolmaps are intentionally excluded as they are handled by a different script phase within
+          # the pod target.
           phase.input_paths.sort.should == %w(
             ${BUILT_PRODUCTS_DIR}/DebugCompiledFramework/DebugCompiledFramework.framework
-            ${PODS_ROOT}/DebugVendoredFramework/ios/A6621399-62A0-3DC3-A6E3-B6B51BD287AD.bcsymbolmap
             ${PODS_ROOT}/DebugVendoredFramework/ios/DebugVendoredFramework.framework
-            ${PODS_ROOT}/DebugVendoredFramework/ios/DebugVendoredFramework.framework.dSYM
             ${PODS_ROOT}/ReleaseVendoredFramework/ios/ReleaseVendoredFramework.framework
-            ${PODS_ROOT}/ReleaseVendoredFramework/ios/ReleaseVendoredFramework.framework.dSYM
             ${PODS_ROOT}/Target\ Support\ Files/Pods/Pods-frameworks.sh
           )
           phase.output_paths.sort.should == %w(
-            ${BUILT_PRODUCTS_DIR}/A6621399-62A0-3DC3-A6E3-B6B51BD287AD.bcsymbolmap
-            ${DWARF_DSYM_FOLDER_PATH}/DebugVendoredFramework.framework.dSYM
-            ${DWARF_DSYM_FOLDER_PATH}/ReleaseVendoredFramework.framework.dSYM
             ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/DebugCompiledFramework.framework
             ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/DebugVendoredFramework.framework
             ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReleaseVendoredFramework.framework
@@ -498,62 +502,33 @@ module Pod
             ${BUILT_PRODUCTS_DIR}/DebugCompiledFramework/CompiledFramework.framework
             ${BUILT_PRODUCTS_DIR}/ReleaseCompiledFramework/CompiledFramework.framework
             ${PODS_ROOT}/DebugVendoredFramework/ios/SomeFramework.framework
-            ${PODS_ROOT}/DebugVendoredFramework/ios/SomeFramework.framework.dSYM
             ${PODS_ROOT}/ReleaseVendoredFramework/ios/SomeFramework.framework
-            ${PODS_ROOT}/ReleaseVendoredFramework/ios/SomeFramework.framework.dSYM
             ${PODS_ROOT}/Target\ Support\ Files/Pods/Pods-frameworks.sh
           )
           phase.output_paths.sort.should == %w(
-            ${DWARF_DSYM_FOLDER_PATH}/SomeFramework.framework.dSYM
             ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CompiledFramework.framework
             ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/SomeFramework.framework
           )
         end
 
-        it 'does not add prepare artifacts build phase with no xcframeworks' do
-          @pod_bundle.stubs(:xcframeworks_by_config => { 'Debug' => {}, 'Release' => {} })
+        it 'removes script phases that have been removed from CocoaPods' do
           @target_integrator.integrate!
           target = @target_integrator.send(:native_targets).first
-          phase = target.shell_script_build_phases.find { |bp| bp.name == @prepare_artifacts_phase_name }
-          phase.should.be.nil
-        end
+          TargetIntegrator::REMOVED_SCRIPT_PHASE_NAMES.each do |name|
+            phase = target.shell_script_build_phases.find { |bp| bp.name.end_with?(name) }
+            phase.should.be.nil?
 
-        it 'removes prepare artifacts build phase if it becomes empty' do
-          xcframework = Xcode::XCFramework.new(fixture('CoconutLib.xcframework'))
-          frameworks_by_config = {
-            'Debug' => [xcframework],
-            'Release' => [xcframework],
-          }
-          @pod_bundle.stubs(:xcframeworks_by_config => frameworks_by_config)
-          @target_integrator.integrate!
-          target = @target_integrator.send(:native_targets).first
-          phase = target.shell_script_build_phases.find { |bp| bp.name == @prepare_artifacts_phase_name }
-          phase.should.not.be.nil?
-          # Now pretend the same target has no more xcframeworks, it should remove the script phase
-          @pod_bundle.stubs(:xcframeworks_by_config => {})
-          @target_integrator.integrate!
-          target = @target_integrator.send(:native_targets).first
-          phase = target.shell_script_build_phases.find { |bp| bp.name == @prepare_artifacts_phase_name }
-          phase.should.be.nil
-        end
+            phase = target.new_shell_script_build_phase("#{TargetIntegrator::BUILD_PHASE_PREFIX}#{name}")
+            phase.should.not.be.nil?
+          end
 
-        it 'adds prepare artifacts build phase input and output paths for vendored xcframeworks without duplicate' do
-          xcframework = Xcode::XCFramework.new(fixture('CoconutLib.xcframework'))
-          frameworks_by_config = {
-            'Debug' => [xcframework],
-            'Release' => [xcframework],
-          }
-          @pod_bundle.stubs(:xcframeworks_by_config => frameworks_by_config)
+          # Re-integrate and ensure the phases are now removed
+          target.new_shell_script_build_phase('[CP] Prepare Artifacts')
           @target_integrator.integrate!
-          target = @target_integrator.send(:native_targets).first
-          phase = target.shell_script_build_phases.find { |bp| bp.name == @prepare_artifacts_phase_name }
-          phase.input_paths.sort.should == %w(
-            ${PODS_ROOT}/../../spec/fixtures/CoconutLib.xcframework
-            ${PODS_ROOT}/Target\ Support\ Files/Pods/Pods-artifacts.sh
-          )
-          phase.output_paths.sort.should == %w(
-            ${BUILT_PRODUCTS_DIR}/cocoapods-artifacts-${CONFIGURATION}.txt
-          )
+          TargetIntegrator::REMOVED_SCRIPT_PHASE_NAMES.each do |name|
+            phase = target.shell_script_build_phases.find { |bp| bp.name.end_with?(name) }
+            phase.should.be.nil?
+          end
         end
 
         it 'adds a custom shell script phase' do
@@ -600,6 +575,7 @@ module Pod
           @target_integrator.integrate!
           target = @target_integrator.send(:native_targets).first
           phase = target.shell_script_build_phases.find { |bp| bp.name == @user_script_phase_name }
+          phase.should.not.be.nil?
           phase.name.should == '[CP-User] Custom Script'
           phase.shell_script.should == 'echo "Hello World"'
           phase.shell_path.should == '/bin/sh'
@@ -618,6 +594,7 @@ module Pod
           @target_integrator.integrate!
           target = @target_integrator.send(:native_targets).first
           phase = target.shell_script_build_phases.find { |bp| bp.name == @user_script_phase_name }
+          phase.should.not.be.nil?
           phase.show_env_vars_in_log.should == '0'
         end
 
@@ -765,11 +742,23 @@ module Pod
                                       '${PODS_ROOT}/ReleaseVendoredFramework/ios/SomeFramework.framework.dSYM'),
             Xcode::FrameworkPaths.new('${BUILT_PRODUCTS_DIR}/ReleaseCompiledFramework/CompiledFramework.framework'),
           ]
-          TargetIntegrator.framework_output_paths(paths).sort.should == %w(
-            ${DWARF_DSYM_FOLDER_PATH}/SomeFramework.framework.dSYM
+          xcframeworks = [
+            Xcode::XCFramework.new(fixture('CoconutLib.xcframework')),
+          ]
+          xcframeworks[0].stubs(:build_type).returns(BuildType.dynamic_framework)
+          TargetIntegrator.embed_frameworks_output_paths(paths, xcframeworks).sort.should == %w(
+            ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CoconutLib.framework
             ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CompiledFramework.framework
             ${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/SomeFramework.framework
           )
+        end
+
+        it 'does not include static xcframeworks in the embed frameworks output paths' do
+          xcframeworks = [
+            Xcode::XCFramework.new(fixture('CoconutLib.xcframework')),
+          ]
+          xcframeworks[0].stubs(:build_type).returns(BuildType.static_framework)
+          TargetIntegrator.embed_frameworks_output_paths([], xcframeworks).should == []
         end
 
         it 'calculates the output paths of the copy resources script' do

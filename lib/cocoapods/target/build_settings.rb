@@ -43,7 +43,13 @@ module Pod
       # @return [String]
       #   The variable for the configuration build directory used when building pod targets.
       #
-      CONFIGURATION_BUILD_DIR_VARIABLE = '${PODS_CONFIGURATION_BUILD_DIR}'.freeze
+      CONFIGURATION_BUILD_DIR_VARIABLE = '${PODS_CONFIGURATION_BUILD_DIR}'
+
+      # @return [String]
+      #   The variable for the configuration intermediate frameworks directory used for building pod targets
+      #   that contain vendored xcframeworks.
+      #
+      XCFRAMEWORKS_BUILD_DIR_VARIABLE = '${PODS_XCFRAMEWORKS_BUILD_DIR}'
 
       #-------------------------------------------------------------------------#
 
@@ -95,7 +101,7 @@ module Pod
                                             from_search_paths_aggregate_targets: false, from_pod_targets_to_link: false,
                                             &implementation)
 
-        memoized_key = "#{self}##{method_name}".freeze
+        memoized_key = "#{self}##{method_name}"
 
         (@build_settings_names ||= Set.new) << method_name.to_s.upcase if build_setting
 
@@ -133,6 +139,14 @@ module Pod
         end
       end
       private_class_method :define_build_settings_method
+
+      # @param [XCFramework] xcframework the xcframework thats slice will be copied to the intermediates dir
+      #
+      # @return [String] the path to the directory containing the xcframework slice
+      #
+      def self.xcframework_intermediate_dir(xcframework)
+        "#{XCFRAMEWORKS_BUILD_DIR_VARIABLE}/#{xcframework.name}"
+      end
 
       class << self
         #-------------------------------------------------------------------------#
@@ -202,6 +216,10 @@ module Pod
       # @return [String]
       define_build_settings_method :pods_configuration_build_dir, :build_setting => true do
         '${PODS_BUILD_DIR}/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)'
+      end
+
+      define_build_settings_method :pods_xcframeworks_build_dir, :build_setting => true do
+        '$(PODS_CONFIGURATION_BUILD_DIR)/XCFrameworkIntermediates'
       end
 
       # @return [String]
@@ -314,6 +332,13 @@ module Pod
         false
       end
 
+      # Xcode 12 turns on this warning by default which is problematic for CocoaPods-generated
+      # imports which use double-quoted paths.
+      # @return [Boolean]
+      define_build_settings_method :clang_warn_quoted_include_in_framework_header, :build_setting => true do
+        'NO'
+      end
+
       # @return [Array<String>]
       #   the `LD_RUNPATH_SEARCH_PATHS` needed for dynamically linking the {#target}
       #
@@ -321,18 +346,26 @@ module Pod
       #
       # @param [Boolean] test_bundle
       #
-      def _ld_runpath_search_paths(requires_host_target: false, test_bundle: false)
-        if target.platform.symbolic_name == :osx
-          ["'@executable_path/../Frameworks'",
-           test_bundle ? "'@loader_path/../Frameworks'" : "'@loader_path/Frameworks'"]
-        else
-          paths = [
-            "'@executable_path/Frameworks'",
-            "'@loader_path/Frameworks'",
-          ]
-          paths << "'@executable_path/../../Frameworks'" if requires_host_target
-          paths
+      def _ld_runpath_search_paths(requires_host_target: false, test_bundle: false, uses_swift: false)
+        paths = []
+        if uses_swift
+          paths << '/usr/lib/swift'
+          paths << '$(PLATFORM_DIR)/Developer/Library/Frameworks' if test_bundle
         end
+        if target.platform.symbolic_name == :osx
+          paths << "'@executable_path/../Frameworks'"
+          paths << if test_bundle
+                     "'@loader_path/../Frameworks'"
+                   else
+                     "'@loader_path/Frameworks'"
+                   end
+          paths << '${DT_TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME}' if uses_swift
+        else
+          paths << "'@executable_path/Frameworks'"
+          paths << "'@loader_path/Frameworks'"
+          paths << "'@executable_path/../../Frameworks'" if requires_host_target
+        end
+        paths
       end
       private :_ld_runpath_search_paths
 
@@ -475,6 +508,14 @@ module Pod
         pod_targets - subset_targets
       end
 
+      # @param  [Pathname,String] path the path to the xcframework bundle
+      #
+      # @return [Xcode::XCFramework] the xcframework at the given path
+      #
+      def load_xcframework(path)
+        Xcode::XCFramework.new(path)
+      end
+
       # A subclass that generates build settings for a {PodTarget}
       class PodTargetSettings < BuildSettings
         #-------------------------------------------------------------------------#
@@ -576,13 +617,22 @@ module Pod
           frameworks.concat consumer_frameworks
           if library_xcconfig?
             # We know that this library target is being built dynamically based
-            # on the guard above, so include any vendored static frameworks.
+            # on the guard above, so include any vendored static frameworks and vendored xcframeworks.
             if target.should_build?
               frameworks.concat vendored_static_frameworks.map { |l| File.basename(l, '.framework') }
-              frameworks.concat vendored_xcframeworks.map(&:name)
+              frameworks.concat vendored_xcframeworks.
+                select { |xcf| xcf.build_type.static_framework? }.
+                map(&:name).
+                uniq
+
+              # Include direct dynamic dependencies to the linker flags. We used to add those in the 'Link Binary With Libraries'
+              # phase but we no longer do since we cannot differentiate between debug or release configurations within
+              # that phase.
+              frameworks.concat target.dependent_targets_by_config[@configuration].flat_map { |pt| pt.build_settings[@configuration].dynamic_frameworks_to_import }
+            else
+              # Also include any vendored dynamic frameworks of dependencies.
+              frameworks.concat dependent_targets.reject(&:should_build?).flat_map { |pt| pt.build_settings[@configuration].dynamic_frameworks_to_import }
             end
-            # Also include any vendored dynamic frameworks of dependencies.
-            frameworks.concat dependent_targets.reject(&:should_build?).flat_map { |pt| pt.build_settings[@configuration].dynamic_frameworks_to_import }
           else
             frameworks.concat dependent_targets_to_link.flat_map { |pt| pt.build_settings[@configuration].frameworks_to_import }
           end
@@ -596,7 +646,7 @@ module Pod
           static_frameworks_to_import.concat vendored_static_frameworks.map { |f| File.basename(f, '.framework') } unless target.should_build? && target.build_as_dynamic?
           unless target.should_build? && target.build_as_dynamic?
             static_frameworks_to_import.concat vendored_xcframeworks.
-              select(&:includes_static_slices?).
+              select { |xcf| xcf.build_type.static_framework? }.
               map(&:name).
               uniq
           end
@@ -608,7 +658,7 @@ module Pod
         define_build_settings_method :dynamic_frameworks_to_import, :memoized => true do
           dynamic_frameworks_to_import = vendored_dynamic_frameworks.map { |f| File.basename(f, '.framework') }
           dynamic_frameworks_to_import.concat vendored_xcframeworks.
-            select(&:includes_dynamic_slices?).
+            select { |xcf| xcf.build_type.dynamic_framework? }.
             map(&:name).
             uniq
           dynamic_frameworks_to_import << target.product_basename if target.should_build? && target.build_as_dynamic_framework?
@@ -656,12 +706,11 @@ module Pod
           search_paths.concat file_accessors.
             flat_map(&:vendored_frameworks).
             map { |f| File.join '${PODS_ROOT}', f.dirname.relative_path_from(target.sandbox.root) }
-          # Include each slice in the framework search paths.
-          # Xcode will not search inside an .xcframework for headers within each slice
-          search_paths.concat vendored_xcframeworks.
-            flat_map(&:slices).
-            select { |slice| slice.platform.symbolic_name == target.platform.symbolic_name }.
-            flat_map { |slice| File.join '${PODS_ROOT}', slice.path.dirname.relative_path_from(target.sandbox.root) }
+          xcframework_intermediates = vendored_xcframeworks.
+                                      select { |xcf| xcf.build_type.framework? }.
+                                      map { |xcf| BuildSettings.xcframework_intermediate_dir(xcf) }.
+                                      uniq
+          search_paths.concat xcframework_intermediates
           search_paths
         end
 
@@ -686,7 +735,7 @@ module Pod
 
         # @return [Array<Xcode::XCFramework>]
         define_build_settings_method :vendored_xcframeworks, :memoized => true do
-          file_accessors.flat_map(&:vendored_xcframeworks).map { |path| Xcode::XCFramework.new(path) }
+          file_accessors.flat_map(&:vendored_xcframeworks).map { |path| load_xcframework(path) }
         end
 
         # @return [Array<String>]
@@ -707,7 +756,7 @@ module Pod
         # @return [Array<String>]
         #
         def linker_names_from_libraries(libraries)
-          libraries.map { |l| File.basename(l, l.extname).sub(/\Alib/, '') }
+          libraries.map { |l| File.basename(l, File.extname(l)).sub(/\Alib/, '') }
         end
 
         # @return [Array<String>]
@@ -718,6 +767,11 @@ module Pod
           if non_library_xcconfig? || target.build_as_dynamic?
             libraries.concat linker_names_from_libraries(vendored_static_libraries)
             libraries.concat libraries_to_import
+            xcframework_libraries = vendored_xcframeworks.
+                                    select { |xcf| xcf.build_type.static_library? }.
+                                    flat_map { |xcf| linker_names_from_libraries([xcf.slices.first.binary_path]) }.
+                                    uniq
+            libraries.concat xcframework_libraries
           end
           if non_library_xcconfig?
             libraries.concat dependent_targets.flat_map { |pt| pt.build_settings[@configuration].dynamic_libraries_to_import }
@@ -729,7 +783,14 @@ module Pod
         # @return [Array<String>]
         define_build_settings_method :static_libraries_to_import, :memoized => true do
           static_libraries_to_import = []
-          static_libraries_to_import.concat linker_names_from_libraries(vendored_static_libraries) unless target.should_build? && target.build_as_dynamic?
+          unless target.should_build? && target.build_as_dynamic?
+            static_libraries_to_import.concat linker_names_from_libraries(vendored_static_libraries)
+            xcframework_libraries = vendored_xcframeworks.
+                                    select { |xcf| xcf.build_type.static_library? }.
+                                    flat_map { |xcf| linker_names_from_libraries([xcf.slices.first.binary_path]) }.
+                                    uniq
+            static_libraries_to_import.concat linker_names_from_libraries(xcframework_libraries)
+          end
           static_libraries_to_import << target.product_basename if target.should_build? && target.build_as_static_library?
           static_libraries_to_import
         end
@@ -775,20 +836,33 @@ module Pod
 
         # @return [Array<String>]
         define_build_settings_method :vendored_static_library_search_paths, :memoized => true do
-          vendored_static_libraries.map { |f| File.join '${PODS_ROOT}', f.dirname.relative_path_from(target.sandbox.root) }
+          paths = vendored_static_libraries.map { |f| File.join '${PODS_ROOT}', f.dirname.relative_path_from(target.sandbox.root) }
+          paths.concat vendored_xcframeworks.
+            select { |xcf| xcf.build_type.static_library? }.
+            map { |xcf| BuildSettings.xcframework_intermediate_dir(xcf) }
+          paths
         end
 
         # @return [Array<String>]
         define_build_settings_method :vendored_dynamic_library_search_paths, :memoized => true do
-          vendored_dynamic_libraries.map { |f| File.join '${PODS_ROOT}', f.dirname.relative_path_from(target.sandbox.root) }
+          paths = vendored_dynamic_libraries.map { |f| File.join '${PODS_ROOT}', f.dirname.relative_path_from(target.sandbox.root) }
+          paths.concat vendored_xcframeworks.
+            select { |xcf| xcf.build_type.dynamic_library? }.
+            map { |xcf| BuildSettings.xcframework_intermediate_dir(xcf) }
+          paths
         end
 
         # @return [Array<String>]
         define_build_settings_method :library_search_paths_to_import, :memoized => true do
-          vendored_library_search_paths = vendored_static_library_search_paths + vendored_dynamic_library_search_paths
-          return vendored_library_search_paths if target.build_as_framework? || !target.should_build?
+          search_paths = vendored_static_library_search_paths + vendored_dynamic_library_search_paths
+          if target.uses_swift? || other_swift_flags_without_swift?
+            search_paths << '/usr/lib/swift'
+            search_paths << '${DT_TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME}'
+            search_paths << '$(PLATFORM_DIR)/Developer/Library/Frameworks' if test_xcconfig?
+          end
+          return search_paths if target.build_as_framework? || !target.should_build?
 
-          vendored_library_search_paths << target.configuration_build_dir(CONFIGURATION_BUILD_DIR_VARIABLE)
+          search_paths << target.configuration_build_dir(CONFIGURATION_BUILD_DIR_VARIABLE)
         end
 
         #-------------------------------------------------------------------------#
@@ -816,7 +890,16 @@ module Pod
 
         # @return [Array<String>]
         define_build_settings_method :header_search_paths, :build_setting => true, :memoized => true, :sorted => true do
-          target.header_search_paths(:include_dependent_targets_for_test_spec => test_xcconfig? && non_library_spec, :include_dependent_targets_for_app_spec => app_xcconfig? && non_library_spec, :configuration => @configuration)
+          paths = target.header_search_paths(:include_dependent_targets_for_test_spec => test_xcconfig? && non_library_spec, :include_dependent_targets_for_app_spec => app_xcconfig? && non_library_spec, :configuration => @configuration)
+
+          dependent_vendored_xcframeworks = []
+          dependent_vendored_xcframeworks.concat vendored_xcframeworks
+          dependent_vendored_xcframeworks.concat dependent_targets.flat_map { |pt| pt.build_settings[@configuration].vendored_xcframeworks }
+          paths.concat dependent_vendored_xcframeworks.
+            select { |xcf| xcf.build_type.static_library? }.
+            map { |xcf| "#{BuildSettings.xcframework_intermediate_dir(xcf)}/Headers" }.
+            compact
+          paths
         end
 
         # @return [Array<String>]
@@ -884,7 +967,8 @@ module Pod
         # @return [Array<String>]
         define_build_settings_method :ld_runpath_search_paths, :build_setting => true, :memoized => true do
           return if library_xcconfig?
-          _ld_runpath_search_paths(:test_bundle => test_xcconfig?)
+          _ld_runpath_search_paths(:test_bundle => test_xcconfig?,
+                                   :uses_swift => other_swift_flags_without_swift? || dependent_targets.any?(&:uses_swift?))
         end
 
         #-------------------------------------------------------------------------#
@@ -910,6 +994,11 @@ module Pod
         # @return [String]
         define_build_settings_method :application_extension_api_only, :build_setting => true, :memoized => true do
           target.application_extension_api_only ? 'YES' : nil
+        end
+
+        # @return [String]
+        define_build_settings_method :build_library_for_distribution, :build_setting => true, :memoized => true do
+          target.build_library_for_distribution ? 'YES' : nil
         end
 
         #-------------------------------------------------------------------------#
@@ -1098,6 +1187,13 @@ module Pod
             select { |pt| pt.build_as_framework? && pt.should_build? }.
             map { |pt| pt.build_settings[@configuration].framework_header_search_path }
 
+          xcframework_library_headers = pod_targets.flat_map { |pt| pt.build_settings[@configuration].vendored_xcframeworks }.
+                                        select { |xcf| xcf.build_type.static_library? }.
+                                        map { |xcf| "#{BuildSettings.xcframework_intermediate_dir(xcf)}/Headers" }.
+                                        compact
+
+          paths.concat xcframework_library_headers
+
           paths.concat target.search_paths_aggregate_targets.flat_map { |at| at.build_settings(configuration_name).header_search_paths }
 
           paths
@@ -1175,7 +1271,8 @@ module Pod
           return unless pod_targets.any?(&:build_as_dynamic?) || any_vendored_dynamic_artifacts?
           symbol_type = target.user_targets.map(&:symbol_type).uniq.first
           test_bundle = symbol_type == :octest_bundle || symbol_type == :unit_test_bundle || symbol_type == :ui_test_bundle
-          _ld_runpath_search_paths(:requires_host_target => target.requires_host_target?, :test_bundle => test_bundle)
+          _ld_runpath_search_paths(:requires_host_target => target.requires_host_target?, :test_bundle => test_bundle,
+                                   :uses_swift => pod_targets.any?(&:uses_swift?))
         end
 
         # @return [Boolean]

@@ -103,9 +103,9 @@ module Pod
       end]
     end
 
-    # @return [Hash{String => (Specification,PodTarget)}] tuples of app specs and pod targets by test spec name.
+    # @return [Hash{Specification => (Specification,PodTarget)}] tuples of app specs and pod targets by test spec.
     #
-    attr_accessor :test_app_hosts_by_spec_name
+    attr_accessor :test_app_hosts_by_spec
 
     # @return [Hash{String => BuildSettings}] the test spec build settings for this target.
     #
@@ -153,7 +153,7 @@ module Pod
       self.dependent_targets = []
       self.test_dependent_targets_by_spec_name = Hash[test_specs.map { |ts| [ts.name, []] }]
       self.app_dependent_targets_by_spec_name = Hash[app_specs.map { |as| [as.name, []] }]
-      @test_app_hosts_by_spec_name = {}
+      @test_app_hosts_by_spec = {}
       @build_config_cache = {}
       @test_spec_build_settings_by_config = create_test_build_settings_by_config
       @app_spec_build_settings_by_config = create_app_build_settings_by_config
@@ -171,7 +171,7 @@ module Pod
         cache_key = [specs, target_definition]
         cache[cache_key] ||= begin
           target = PodTarget.new(sandbox, build_type, user_build_configurations, archs, platform, specs,
-                                 [target_definition], file_accessors, target_definition.label)
+                                 [target_definition], file_accessors, target_definition.label, swift_version)
           scope_dependent_targets = ->(dependent_targets) do
             dependent_targets.flat_map do |pod_target|
               pod_target.scoped(cache).select { |pt| pt.target_definitions == [target_definition] }
@@ -185,8 +185,8 @@ module Pod
           target.app_dependent_targets_by_spec_name_by_config = Hash[app_dependent_targets_by_spec_name_by_config.map do |spec_name, app_pod_targets_by_config|
             [spec_name, Hash[app_pod_targets_by_config.map { |k, v| [k, scope_dependent_targets[v]] }]]
           end]
-          target.test_app_hosts_by_spec_name = Hash[test_app_hosts_by_spec_name.map do |spec_name, (app_host_spec, app_pod_target)|
-            [spec_name, [app_host_spec, app_pod_target.scoped(cache).find { |pt| pt.target_definitions == [target_definition] }]]
+          target.test_app_hosts_by_spec = Hash[test_app_hosts_by_spec.map do |spec, (app_host_spec, app_pod_target)|
+            [spec, [app_host_spec, app_pod_target.scoped(cache).find { |pt| pt.target_definitions == [target_definition] }]]
           end]
           target
         end
@@ -301,15 +301,19 @@ module Pod
       app_specs.map { |app_spec| app_spec.consumer(platform) }
     end
 
-    # @return [Boolean] Whether the target uses Swift code. This excludes source files from non library specs.
+    # Checks whether the target itself plus its specs uses Swift code.
+    # This check excludes source files from non library specs.
+    # Note that if a target does not need to be built (no source code),
+    # we fallback to check whether it indicates a swift version.
+    #
+    # @return [Boolean] Whether the target uses Swift code.
     #
     def uses_swift?
       return @uses_swift if defined? @uses_swift
-      @uses_swift = begin
+      @uses_swift = (!should_build? && !spec_swift_versions.empty?) ||
         file_accessors.select { |a| a.spec.library_specification? }.any? do |file_accessor|
           uses_swift_for_spec?(file_accessor.spec)
         end
-      end
     end
 
     # Checks whether a specification uses Swift or not.
@@ -430,13 +434,22 @@ module Pod
     end
 
     # @return [Hash{String=>Array<String>}] The resource and resource bundle paths this target depends upon keyed by
-    #         spec name. Resources for app specs and test specs are directly added to “Copy Bundle Resources” phase
-    #         from the generated targets for frameworks, but not libraries. Therefore they are not part of the resource paths.
+    #         spec name. Resource (not resource bundles) paths can vary depending on the type of spec:
+    #           - App specs _always_ get their resource paths added to "Copy Bundle Resources" phase from
+    #             [PodTargetInstaller] therefore their resource paths are never included here.
+    #           - Test specs may have their resource paths added to "Copy Bundle Resources" if the target itself is
+    #             built as a framework, which is again checked and handled by PodTargetInstaller. If that is true then
+    #             the resource paths are not included, otherwise they are included and handled via the CocoaPods copy
+    #             resources script phase.
+    #           - Library specs _do not_ have per-configuration CocoaPods copy resources script phase and their resource
+    #             paths will be added to "Copy Bundle Resources" phase if the target is built as a framework because
+    #             it supports it. We always include the resource paths for library specs because they are also
+    #             integrated to the user target.
     #
     def resource_paths
       @resource_paths ||= begin
         file_accessors.each_with_object({}) do |file_accessor, hash|
-          resource_paths = if file_accessor.spec.non_library_specification? && build_as_framework?
+          resource_paths = if file_accessor.spec.app_specification? || (file_accessor.spec.test_specification? && build_as_framework?)
                              []
                            else
                              file_accessor.resources.map do |res|
@@ -582,7 +595,7 @@ module Pod
     #         app host, and the second item is the target name of the app host
     #
     def app_host_target_label(test_spec)
-      app_spec, app_target = test_app_hosts_by_spec_name[test_spec.name]
+      app_spec, app_target = test_app_hosts_by_spec[test_spec]
 
       if app_spec
         [app_target.name, app_target.app_target_label(app_spec)]
@@ -601,7 +614,7 @@ module Pod
     #
     def app_host_dependent_targets_for_spec(spec, configuration: nil)
       return [] unless spec.test_specification? && spec.consumer(platform).test_type == :unit
-      app_host_info = test_app_hosts_by_spec_name[spec.name]
+      app_host_info = test_app_hosts_by_spec[spec]
       if app_host_info.nil?
         []
       else
@@ -684,10 +697,32 @@ module Pod
       support_files_dir + "#{non_library_spec_label(spec)}-frameworks-output-files.xcfilelist"
     end
 
+    # @return [Pathname] The absolute path of the copy xcframeworks script.
+    #
+    def copy_xcframeworks_script_path
+      support_files_dir + "#{label}-xcframeworks.sh"
+    end
+
+    # @return [String] The path of the copy xcframeworks input files file list
+    #
+    def copy_xcframeworks_script_input_files_path
+      support_files_dir + "#{label}-xcframeworks-input-files.xcfilelist"
+    end
+
+    # @return [String] The path of the copy xcframeworks output files file list
+    #
+    def copy_xcframeworks_script_output_files_path
+      support_files_dir + "#{label}-xcframeworks-output-files.xcfilelist"
+    end
+
     # @param  [Specification] spec
     #         The spec this script path is for.
     #
     # @return [Pathname] The absolute path of the prepare artifacts script for the given spec.
+    #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
     #
     def prepare_artifacts_script_path_for_spec(spec)
       support_files_dir + "#{non_library_spec_label(spec)}-artifacts.sh"
@@ -698,6 +733,10 @@ module Pod
     #
     # @return [Pathname] The absolute path of the prepare artifacts script input file list for the given spec.
     #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
+    #
     def prepare_artifacts_script_input_files_path_for_spec(spec)
       support_files_dir + "#{non_library_spec_label(spec)}-artifacts-input-files.xcfilelist"
     end
@@ -707,8 +746,30 @@ module Pod
     #
     # @return [Pathname] The absolute path of the prepare artifacts script output file list for the given spec.
     #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
+    #
     def prepare_artifacts_script_output_files_path_for_spec(spec)
       support_files_dir + "#{non_library_spec_label(spec)}-artifacts-output-files.xcfilelist"
+    end
+
+    # @return [Pathname] The absolute path of the copy dSYMs script.
+    #
+    def copy_dsyms_script_path
+      support_files_dir + "#{label}-copy-dsyms.sh"
+    end
+
+    # @return [Pathname] The absolute path of the copy dSYM script phase input file list.
+    #
+    def copy_dsyms_script_input_files_path
+      support_files_dir + "#{label}-copy-dsyms-input-files.xcfilelist"
+    end
+
+    # @return [Pathname] The absolute path of the copy dSYM script phase output file list.
+    #
+    def copy_dsyms_script_output_files_path
+      support_files_dir + "#{label}-copy-dsyms-output-files.xcfilelist"
     end
 
     # @param  [Specification] spec
@@ -1064,6 +1125,23 @@ module Pod
         mappings[sub_dir] << header
       end
       mappings
+    end
+
+    # @!group Deprecated APIs
+    # ----------------------------------------------------------------------- #
+
+    public
+
+    # @deprecated Use `test_app_hosts_by_spec` instead.
+    #
+    # @todo Remove in 2.0
+    #
+    # @return [Hash{String => (Specification,PodTarget)}] tuples of app specs and pod targets by test spec name.
+    #
+    def test_app_hosts_by_spec_name
+      Hash[test_app_hosts_by_spec.map do |spec, value|
+        [spec.name, value]
+      end]
     end
   end
 end

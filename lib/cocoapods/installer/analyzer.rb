@@ -446,11 +446,18 @@ module Pod
           is_app_extension ||= aggregate_target.user_targets.any? do |user_target|
             user_target.common_resolved_build_setting('APPLICATION_EXTENSION_API_ONLY', :resolve_against_xcconfig => true) == 'YES'
           end
+          if is_app_extension
+            aggregate_target.mark_application_extension_api_only
+            aggregate_target.pod_targets.each(&:mark_application_extension_api_only)
+          end
 
-          next unless is_app_extension
-
-          aggregate_target.mark_application_extension_api_only
-          aggregate_target.pod_targets.each(&:mark_application_extension_api_only)
+          build_library_for_distribution = aggregate_target.user_targets.any? do |user_target|
+            user_target.common_resolved_build_setting('BUILD_LIBRARY_FOR_DISTRIBUTION', :resolve_against_xcconfig => true) == 'YES'
+          end
+          if build_library_for_distribution
+            aggregate_target.mark_build_library_for_distribution
+            aggregate_target.pod_targets.each(&:mark_build_library_for_distribution)
+          end
         end
 
         if installation_options.integrate_targets?
@@ -648,8 +655,10 @@ module Pod
           resolver_specs_by_target.flat_map do |target_definition, specs|
             grouped_specs = specs.group_by(&:root).values.uniq
             pod_targets = grouped_specs.flat_map do |pod_specs|
-              build_type = determine_build_type(pod_specs.first, target_definition.build_type)
-              generate_pod_target([target_definition], build_type, target_inspections, pod_specs.map(&:spec)).scoped(dedupe_cache)
+              build_type = determine_build_type(pod_specs.first.spec, target_definition.build_type)
+              swift_version = determine_swift_version(pod_specs.first.spec, [target_definition])
+              generate_pod_target([target_definition], build_type, target_inspections, pod_specs.map(&:spec),
+                                  :swift_version => swift_version).scoped(dedupe_cache)
             end
 
             compute_pod_target_dependencies(pod_targets, specs.map(&:spec).group_by(&:name))
@@ -690,13 +699,13 @@ module Pod
             hash[app_spec.name] = Hash[app_dependencies_by_config.map { |k, v| [k, filter_dependencies(v, pod_targets_by_name, target)] }]
           end
 
-          target.test_app_hosts_by_spec_name = target.test_specs.each_with_object({}) do |test_spec, hash|
+          target.test_app_hosts_by_spec = target.test_specs.each_with_object({}) do |test_spec, hash|
             next unless app_host_name = test_spec.consumer(target.platform).app_host_name
             app_host_spec = pod_targets_by_name[Specification.root_name(app_host_name)].flat_map(&:app_specs).find do |pt|
               pt.name == app_host_name
             end
             app_host_dependencies = { app_host_spec.root => [app_host_spec] }
-            hash[test_spec.name] = [app_host_spec, filter_dependencies(app_host_dependencies, pod_targets_by_name, target).first]
+            hash[test_spec] = [app_host_spec, filter_dependencies(app_host_dependencies, pod_targets_by_name, target).first]
           end
         end
       end

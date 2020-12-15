@@ -18,7 +18,7 @@ module Pod
         Pod::Executable.capture_command!('git', %W(remote add origin #{upstream}))
         Pod::Executable.capture_command!('git', %w(remote -v))
         Pod::Executable.capture_command!('git', %w(fetch -q))
-        Pod::Executable.capture_command!('git', %w(branch --set-upstream-to=origin/master master))
+        Pod::Executable.capture_command!('git', %w(branch --set-upstream-to=origin/main main))
       end
       config.sources_manager.expects(:update_search_index_if_needed_in_background).with({}).returns(nil)
       lambda { command('repo', 'update').run }.should.not.raise
@@ -37,6 +37,16 @@ module Pod
       end
       run_command('repo', 'update', 'repo2')
       (repo2 + 'README').read.should.include 'Updated'
+    end
+
+    # Conditionally skip the test if `tmutil` is not available.
+    has_tmutil = system('tmutil', 'version', :out => File::NULL)
+    cit = has_tmutil ? method(:it) : method(:xit)
+    cit.call 'excludes the spec-repo from Time Machine backups' do
+      repo_make('repo1')
+      repo_clone('repo1', 'repo2')
+      run_command('repo', 'update', 'repo2')
+      `tmutil isexcluded #{config.repos_dir + 'repo2'}`.chomp.should.start_with?('[Excluded]')
     end
 
     it 'repo updates do not fail when executed in parallel' do

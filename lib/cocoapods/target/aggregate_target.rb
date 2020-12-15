@@ -98,6 +98,7 @@ module Pod
                           target_definition, client_root, user_project, user_target_uuids, merged).tap do |aggregate_target|
         aggregate_target.search_paths_aggregate_targets.concat(search_paths_aggregate_targets).freeze
         aggregate_target.mark_application_extension_api_only if application_extension_api_only
+        aggregate_target.mark_build_library_for_distribution if build_library_for_distribution
       end
     end
 
@@ -284,6 +285,20 @@ module Pod
           resources_by_config[config] = targets.flat_map do |pod_target|
             library_specs = pod_target.library_specs.map(&:name)
             resource_paths = pod_target.resource_paths.values_at(*library_specs).flatten
+
+            if pod_target.build_as_static_framework?
+              built_product_dir = Pathname.new(pod_target.build_product_path('${BUILT_PRODUCTS_DIR}'))
+              resource_paths = resource_paths.map do |resource_path|
+                extname = File.extname(resource_path)
+                if self.class.resource_extension_compilable?(extname)
+                  output_extname = self.class.output_extension_for_resource(extname)
+                  built_product_dir.join(File.basename(resource_path, extname)).sub_ext(output_extname).to_s
+                else
+                  resource_path
+                end
+              end
+            end
+
             resource_paths << bridge_support_file
             resource_paths.compact.uniq
           end
@@ -359,6 +374,10 @@ module Pod
     #
     # @return [Pathname] The absolute path of the prepare artifacts script input file list.
     #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
+    #
     def prepare_artifacts_script_input_files_path(configuration)
       support_files_dir + "#{label}-artifacts-#{configuration}-input-files.xcfilelist"
     end
@@ -366,6 +385,10 @@ module Pod
     # @param  [String] configuration the configuration this path is for.
     #
     # @return [Pathname] The absolute path of the prepare artifacts script output file list.
+    #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
     #
     def prepare_artifacts_script_output_files_path(configuration)
       support_files_dir + "#{label}-artifacts-#{configuration}-output-files.xcfilelist"
@@ -453,6 +476,10 @@ module Pod
     # @return [String] The path of the prepare artifacts script relative to the
     #         root of the Pods project.
     #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
+    #
     def prepare_artifacts_script_relative_path
       "${PODS_ROOT}/#{relative_to_pods_root(prepare_artifacts_script_path)}"
     end
@@ -460,12 +487,20 @@ module Pod
     # @return [String] The path of the prepare artifacts script input file list
     #         relative to the root of the Pods project.
     #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
+    #
     def prepare_artifacts_script_input_files_relative_path
       "${PODS_ROOT}/#{relative_to_pods_root(prepare_artifacts_script_input_files_path('${CONFIGURATION}'))}"
     end
 
     # @return [String] The path of the prepare artifacts script output file list
     #         relative to the root of the Pods project.
+    #
+    # @deprecated
+    #
+    # @todo Remove in 2.0
     #
     def prepare_artifacts_script_output_files_relative_path
       "${PODS_ROOT}/#{relative_to_pods_root(prepare_artifacts_script_output_files_path('${CONFIGURATION}'))}"

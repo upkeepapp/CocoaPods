@@ -25,12 +25,11 @@ gem 'json', :git => 'https://github.com/segiddins/json.git', :branch => 'seg-1.7
 
 group :development do
   cp_gem 'claide',                'CLAide'
-  cp_gem 'cocoapods-core',        'Core', '1-9-stable'
+  cp_gem 'cocoapods-core',        'Core'
   cp_gem 'cocoapods-deintegrate', 'cocoapods-deintegrate'
   cp_gem 'cocoapods-downloader',  'cocoapods-downloader'
   cp_gem 'cocoapods-plugins',     'cocoapods-plugins'
   cp_gem 'cocoapods-search',      'cocoapods-search'
-  cp_gem 'cocoapods-stats',       'cocoapods-stats'
   cp_gem 'cocoapods-trunk',       'cocoapods-trunk'
   cp_gem 'cocoapods-try',         'cocoapods-try'
   cp_gem 'molinillo',             'Molinillo'
@@ -39,15 +38,18 @@ group :development do
 
   gem 'cocoapods-dependencies', '~> 1.0.beta.1'
 
-  gem 'activesupport', '>= 4.0.2', '< 5', '!= 4.2.11.12' # Pinned < 5 to ensure we're speccing 4.x.x
+  gem 'activesupport', '> 5', '< 6' # Pinned < 6 because 6 requires Ruby 2.5.0
   gem 'bacon', :git => 'https://github.com/leahneukirchen/bacon.git'
-  gem 'minitest', '5.12.0' # Pinned since > 5.12.0+ drops support for Ruby 2.0
-  gem 'mocha'
+  gem 'mocha', '< 1.5'
   gem 'mocha-on-bacon'
   gem 'netrc'
   gem 'prettybacon'
   gem 'typhoeus'
   gem 'webmock'
+
+  gem 'bigdecimal', '~> 1.3.0'
+  gem 'public_suffix'
+  gem 'ruby-graphviz', '< 1.2.5'
 
   # Integration tests
   gem 'diffy'
@@ -55,9 +57,10 @@ group :development do
 
   # Code Quality
   gem 'inch_by_inch'
-  gem 'rubocop'
+  gem 'rubocop', '0.50.0'
+  gem 'simplecov', '< 0.18'
 
-  gem 'danger'
+  gem 'danger', '~> 5.3'
 end
 
 group :debugging do

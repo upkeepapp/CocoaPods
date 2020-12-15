@@ -8,10 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0703FED423850B5E00CA1431 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 076271E7235CED51005968F9 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		070E7584240C6041007E6F8A /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 070E7580240C6041007E6F8A /* CoconutLib.h */; };
 		076271E9235CED51005968F9 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 076271E7235CED51005968F9 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		076271F8235CED73005968F9 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 076271F6235CED73005968F9 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		07627205235CED86005968F9 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627203235CED86005968F9 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		07627218235CEDF1005968F9 /* Coconut.m in Sources */ = {isa = PBXBuildFile; fileRef = 07627216235CEDF1005968F9 /* Coconut.m */; };
 		07627219235CEDF1005968F9 /* Coconut.m in Sources */ = {isa = PBXBuildFile; fileRef = 07627216235CEDF1005968F9 /* Coconut.m */; };
 		0762721A235CEDF1005968F9 /* Coconut.m in Sources */ = {isa = PBXBuildFile; fileRef = 07627216235CEDF1005968F9 /* Coconut.m */; };
@@ -20,23 +17,85 @@
 		0762721D235CEDF1005968F9 /* Coconut.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627217235CEDF1005968F9 /* Coconut.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		0762721E235CEDF1005968F9 /* Coconut.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627217235CEDF1005968F9 /* Coconut.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		0762721F235CEDF1005968F9 /* Coconut.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627217235CEDF1005968F9 /* Coconut.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		079895542442B26D000FC943 /* Coconut.m in Sources */ = {isa = PBXBuildFile; fileRef = 07627216235CEDF1005968F9 /* Coconut.m */; };
+		079895642442B56B000FC943 /* Coconut.m in Sources */ = {isa = PBXBuildFile; fileRef = 07627216235CEDF1005968F9 /* Coconut.m */; };
+		079895732442B5B5000FC943 /* Coconut.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627217235CEDF1005968F9 /* Coconut.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		079895762442B5E4000FC943 /* Coconut.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627217235CEDF1005968F9 /* Coconut.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		079895772442B5E5000FC943 /* Coconut.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627217235CEDF1005968F9 /* Coconut.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		0798957B2442B5EA000FC943 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 076271E7235CED51005968F9 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		0798957C2442B5EB000FC943 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = 076271E7235CED51005968F9 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		0798958B2442B624000FC943 /* Coconut.h in Headers */ = {isa = PBXBuildFile; fileRef = 07627217235CEDF1005968F9 /* Coconut.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		0798958D2442B62D000FC943 /* Coconut.m in Sources */ = {isa = PBXBuildFile; fileRef = 07627216235CEDF1005968F9 /* Coconut.m */; };
+		0798958E2442B62E000FC943 /* Coconut.m in Sources */ = {isa = PBXBuildFile; fileRef = 07627216235CEDF1005968F9 /* Coconut.m */; };
+		DEC181462517FBA200D82F49 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = DEC181452517FB9C00D82F49 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DEC181572517FBA700D82F49 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = DEC181452517FB9C00D82F49 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DEC181602517FBA700D82F49 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = DEC181452517FB9C00D82F49 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DEC181692517FBA800D82F49 /* CoconutLib.h in Headers */ = {isa = PBXBuildFile; fileRef = DEC181452517FB9C00D82F49 /* CoconutLib.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DEC1819B2517FC7300D82F49 /* module.modulemap in CopyFiles */ = {isa = PBXBuildFile; fileRef = DEC1819A2517FC3D00D82F49 /* module.modulemap */; };
+		DEC181A52517FCC400D82F49 /* module.modulemap in CopyFiles */ = {isa = PBXBuildFile; fileRef = DEC1819A2517FC3D00D82F49 /* module.modulemap */; };
+		DEC181AE2517FCCA00D82F49 /* module.modulemap in CopyFiles */ = {isa = PBXBuildFile; fileRef = DEC1819A2517FC3D00D82F49 /* module.modulemap */; };
+		DEC181B72517FE7400D82F49 /* module.modulemap in CopyFiles */ = {isa = PBXBuildFile; fileRef = DEC1819A2517FC3D00D82F49 /* module.modulemap */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		079895492442B233000FC943 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/local/include;
+			dstSubfolderSpec = 0;
+			files = (
+				DEC181B72517FE7400D82F49 /* module.modulemap in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895592442B55B000FC943 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/local/include;
+			dstSubfolderSpec = 0;
+			files = (
+				DEC181AE2517FCCA00D82F49 /* module.modulemap in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0798957F2442B612000FC943 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/local/include;
+			dstSubfolderSpec = 0;
+			files = (
+				DEC1819B2517FC7300D82F49 /* module.modulemap in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DEC181A42517FC8D00D82F49 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/local/include;
+			dstSubfolderSpec = 0;
+			files = (
+				DEC181A52517FCC400D82F49 /* module.modulemap in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		070E7580240C6041007E6F8A /* CoconutLib.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CoconutLib.h; sourceTree = "<group>"; };
-		070E7583240C6041007E6F8A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		076271E4235CED51005968F9 /* CoconutLib.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CoconutLib.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		076271E7235CED51005968F9 /* CoconutLib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CoconutLib.h; sourceTree = "<group>"; };
-		076271E8235CED51005968F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		076271F4235CED73005968F9 /* CoconutLib.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CoconutLib.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		076271F6235CED73005968F9 /* CoconutLib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CoconutLib.h; sourceTree = "<group>"; };
-		076271F7235CED73005968F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		07627201235CED86005968F9 /* CoconutLib.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CoconutLib.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		07627203235CED86005968F9 /* CoconutLib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CoconutLib.h; sourceTree = "<group>"; };
-		07627204235CED86005968F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0762720E235CED9F005968F9 /* CoconutLib.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CoconutLib.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		07627216235CEDF1005968F9 /* Coconut.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Coconut.m; sourceTree = "<group>"; };
 		07627217235CEDF1005968F9 /* Coconut.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Coconut.h; sourceTree = "<group>"; };
+		0798954B2442B233000FC943 /* libCoconut.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCoconut.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		079895552442B2C9000FC943 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		079895562442B2FE000FC943 /* build.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
+		0798955B2442B55B000FC943 /* libCoconut.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCoconut.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		079895692442B594000FC943 /* libCoconut.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCoconut.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		079895812442B612000FC943 /* libCoconut.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCoconut.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		DEC181452517FB9C00D82F49 /* CoconutLib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CoconutLib.h; sourceTree = "<group>"; };
+		DEC1819A2517FC3D00D82F49 /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,25 +127,42 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		079895482442B233000FC943 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895582442B55B000FC943 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895672442B594000FC943 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0798957E2442B612000FC943 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		070E757F240C6041007E6F8A /* CoconutLib */ = {
-			isa = PBXGroup;
-			children = (
-				070E7580240C6041007E6F8A /* CoconutLib.h */,
-				070E7583240C6041007E6F8A /* Info.plist */,
-			);
-			path = CoconutLib;
-			sourceTree = "<group>";
-		};
 		076271DA235CED51005968F9 = {
 			isa = PBXGroup;
 			children = (
+				079895562442B2FE000FC943 /* build.sh */,
 				076271E6235CED51005968F9 /* CoconutLib */,
-				076271F5235CED73005968F9 /* CoconutLib */,
-				07627202235CED86005968F9 /* CoconutLib */,
-				070E757F240C6041007E6F8A /* CoconutLib */,
 				076271E5235CED51005968F9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -98,6 +174,10 @@
 				076271F4235CED73005968F9 /* CoconutLib.framework */,
 				07627201235CED86005968F9 /* CoconutLib.framework */,
 				0762720E235CED9F005968F9 /* CoconutLib.framework */,
+				0798954B2442B233000FC943 /* libCoconut.a */,
+				0798955B2442B55B000FC943 /* libCoconut.a */,
+				079895692442B594000FC943 /* libCoconut.a */,
+				079895812442B612000FC943 /* libCoconut.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -105,30 +185,22 @@
 		076271E6235CED51005968F9 /* CoconutLib */ = {
 			isa = PBXGroup;
 			children = (
+				DEC181442517FB4500D82F49 /* Library */,
 				07627217235CEDF1005968F9 /* Coconut.h */,
 				07627216235CEDF1005968F9 /* Coconut.m */,
 				076271E7235CED51005968F9 /* CoconutLib.h */,
-				076271E8235CED51005968F9 /* Info.plist */,
+				079895552442B2C9000FC943 /* Info.plist */,
 			);
 			path = CoconutLib;
 			sourceTree = "<group>";
 		};
-		076271F5235CED73005968F9 /* CoconutLib */ = {
+		DEC181442517FB4500D82F49 /* Library */ = {
 			isa = PBXGroup;
 			children = (
-				076271F6235CED73005968F9 /* CoconutLib.h */,
-				076271F7235CED73005968F9 /* Info.plist */,
+				DEC181452517FB9C00D82F49 /* CoconutLib.h */,
+				DEC1819A2517FC3D00D82F49 /* module.modulemap */,
 			);
-			path = CoconutLib;
-			sourceTree = "<group>";
-		};
-		07627202235CED86005968F9 /* CoconutLib */ = {
-			isa = PBXGroup;
-			children = (
-				07627203235CED86005968F9 /* CoconutLib.h */,
-				07627204235CED86005968F9 /* Info.plist */,
-			);
-			path = CoconutLib;
+			path = Library;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -147,8 +219,8 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0798957C2442B5EB000FC943 /* CoconutLib.h in Headers */,
 				0762721D235CEDF1005968F9 /* Coconut.h in Headers */,
-				076271F8235CED73005968F9 /* CoconutLib.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -156,8 +228,8 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0798957B2442B5EA000FC943 /* CoconutLib.h in Headers */,
 				0762721E235CEDF1005968F9 /* Coconut.h in Headers */,
-				07627205235CED86005968F9 /* CoconutLib.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -167,7 +239,42 @@
 			files = (
 				0762721F235CEDF1005968F9 /* Coconut.h in Headers */,
 				0703FED423850B5E00CA1431 /* CoconutLib.h in Headers */,
-				070E7584240C6041007E6F8A /* CoconutLib.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895652442B594000FC943 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				079895732442B5B5000FC943 /* Coconut.h in Headers */,
+				DEC181602517FBA700D82F49 /* CoconutLib.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895742442B5CC000FC943 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				079895762442B5E4000FC943 /* Coconut.h in Headers */,
+				DEC181462517FBA200D82F49 /* CoconutLib.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895752442B5D2000FC943 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				079895772442B5E5000FC943 /* Coconut.h in Headers */,
+				DEC181572517FBA700D82F49 /* CoconutLib.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0798958A2442B621000FC943 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0798958B2442B624000FC943 /* Coconut.h in Headers */,
+				DEC181692517FBA800D82F49 /* CoconutLib.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -246,6 +353,78 @@
 			productReference = 0762720E235CED9F005968F9 /* CoconutLib.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		0798954A2442B233000FC943 /* CoconutLib-iOS-Library */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 079895532442B233000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-iOS-Library" */;
+			buildPhases = (
+				079895742442B5CC000FC943 /* Headers */,
+				079895472442B233000FC943 /* Sources */,
+				079895482442B233000FC943 /* Frameworks */,
+				079895492442B233000FC943 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "CoconutLib-iOS-Library";
+			productName = "CoconutLib-iOS-Library";
+			productReference = 0798954B2442B233000FC943 /* libCoconut.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		0798955A2442B55B000FC943 /* CoconutLib-watchOS-Library */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 079895612442B55B000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-watchOS-Library" */;
+			buildPhases = (
+				079895752442B5D2000FC943 /* Headers */,
+				079895572442B55B000FC943 /* Sources */,
+				079895582442B55B000FC943 /* Frameworks */,
+				079895592442B55B000FC943 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "CoconutLib-watchOS-Library";
+			productName = "CoconutLib-watchOS-Library";
+			productReference = 0798955B2442B55B000FC943 /* libCoconut.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		079895682442B594000FC943 /* CoconutLib-macOS-Library */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0798956F2442B594000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-macOS-Library" */;
+			buildPhases = (
+				079895652442B594000FC943 /* Headers */,
+				079895662442B594000FC943 /* Sources */,
+				079895672442B594000FC943 /* Frameworks */,
+				DEC181A42517FC8D00D82F49 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "CoconutLib-macOS-Library";
+			productName = "CoconutLib-macOS-Library";
+			productReference = 079895692442B594000FC943 /* libCoconut.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		079895802442B612000FC943 /* CoconutLib-tvOS-Library */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 079895872442B612000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-tvOS-Library" */;
+			buildPhases = (
+				0798958A2442B621000FC943 /* Headers */,
+				0798957D2442B612000FC943 /* Sources */,
+				0798957E2442B612000FC943 /* Frameworks */,
+				0798957F2442B612000FC943 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "CoconutLib-tvOS-Library";
+			productName = "CoconutLib-tvOS-Library";
+			productReference = 079895812442B612000FC943 /* libCoconut.a */;
+			productType = "com.apple.product-type.library.static";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -267,6 +446,18 @@
 					0762720D235CED9F005968F9 = {
 						CreatedOnToolsVersion = 11.1;
 					};
+					0798954A2442B233000FC943 = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
+					0798955A2442B55B000FC943 = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
+					079895682442B594000FC943 = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
+					079895802442B612000FC943 = {
+						CreatedOnToolsVersion = 11.3.1;
+					};
 				};
 			};
 			buildConfigurationList = 076271DE235CED51005968F9 /* Build configuration list for PBXProject "CoconutLib" */;
@@ -286,6 +477,10 @@
 				076271F3235CED73005968F9 /* CoconutLib-watchOS */,
 				07627200235CED86005968F9 /* CoconutLib-tvOS */,
 				0762720D235CED9F005968F9 /* CoconutLib-macOS */,
+				0798954A2442B233000FC943 /* CoconutLib-iOS-Library */,
+				0798955A2442B55B000FC943 /* CoconutLib-watchOS-Library */,
+				079895682442B594000FC943 /* CoconutLib-macOS-Library */,
+				079895802442B612000FC943 /* CoconutLib-tvOS-Library */,
 			);
 		};
 /* End PBXProject section */
@@ -354,6 +549,38 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		079895472442B233000FC943 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				079895542442B26D000FC943 /* Coconut.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895572442B55B000FC943 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				079895642442B56B000FC943 /* Coconut.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		079895662442B594000FC943 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0798958D2442B62D000FC943 /* Coconut.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0798957D2442B612000FC943 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0798958E2442B62E000FC943 /* Coconut.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
@@ -392,7 +619,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -500,10 +727,8 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -528,10 +753,8 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -556,10 +779,8 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 3.0;
@@ -585,10 +806,8 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 3.0;
@@ -613,10 +832,8 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = appletvos;
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
 				TVOS_DEPLOYMENT_TARGET = 13.0;
@@ -641,10 +858,8 @@
 					"@loader_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = appletvos;
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
 				TVOS_DEPLOYMENT_TARGET = 13.0;
@@ -671,10 +886,8 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -699,11 +912,125 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				PRODUCT_BUNDLE_IDENTIFIER = org.cocoapods.CoconutLib;
-				PRODUCT_NAME = CoconutLib;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		079895512442B233000FC943 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.2;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = Coconut;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		079895522442B233000FC943 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.2;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = Coconut;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		079895622442B55B000FC943 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = Coconut;
+				SDKROOT = watchos;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 6.1;
+			};
+			name = Debug;
+		};
+		079895632442B55B000FC943 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = Coconut;
+				SDKROOT = watchos;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 6.1;
+			};
+			name = Release;
+		};
+		079895702442B594000FC943 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				EXECUTABLE_PREFIX = lib;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				PRODUCT_NAME = Coconut;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		079895712442B594000FC943 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				EXECUTABLE_PREFIX = lib;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				PRODUCT_NAME = Coconut;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		079895882442B612000FC943 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = Coconut;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 13.2;
+			};
+			name = Debug;
+		};
+		079895892442B612000FC943 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEAD_CODE_STRIPPING = NO;
+				DEFINES_MODULE = YES;
+				MODULEMAP_FILE = CoconutLib/Library/module.modulemap;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_NAME = Coconut;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 13.2;
 			};
 			name = Release;
 		};
@@ -751,6 +1078,42 @@
 			buildConfigurations = (
 				07627214235CED9F005968F9 /* Debug */,
 				07627215235CED9F005968F9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		079895532442B233000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-iOS-Library" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				079895512442B233000FC943 /* Debug */,
+				079895522442B233000FC943 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		079895612442B55B000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-watchOS-Library" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				079895622442B55B000FC943 /* Debug */,
+				079895632442B55B000FC943 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0798956F2442B594000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-macOS-Library" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				079895702442B594000FC943 /* Debug */,
+				079895712442B594000FC943 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		079895872442B612000FC943 /* Build configuration list for PBXNativeTarget "CoconutLib-tvOS-Library" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				079895882442B612000FC943 /* Debug */,
+				079895892442B612000FC943 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -49,6 +49,13 @@ module Pod
         @pod_target.scoped.first.product_name.should == 'libBananaLib-Pods.a'
       end
 
+      it 'returns the swift version' do
+        multiswift_spec = fixture_spec('multi-swift/MultiSwift.podspec')
+        pod_target = fixture_pod_target(multiswift_spec, BuildType.dynamic_framework, {}, [], Platform.ios,
+                                        [@target_definition], nil, '4.0')
+        pod_target.scoped.first.swift_version.should == '4.0'
+      end
+
       it 'returns the spec consumers for the pod targets' do
         @pod_target.spec_consumers.should.not.nil?
       end
@@ -627,6 +634,11 @@ module Pod
           @pod_target.uses_swift?.should == true
         end
 
+        it 'returns that it uses swift with a pre built vendored framework and specifying swift_versions' do
+          pod_target = fixture_pod_target('prebuilt-swift-framework/VendoredSwiftFramework.podspec', true)
+          pod_target.uses_swift?.should == true
+        end
+
         it 'returns the product module name' do
           @pod_target.product_module_name.should == 'OrangeFramework'
         end
@@ -667,8 +679,9 @@ module Pod
           @pod_target.dependent_targets = [@orangeframework_pod_target]
           @pod_target.test_dependent_targets_by_spec_name = { @orangeframework_pod_target.name => [@matryoshka_pod_target] }
           @pod_target.app_dependent_targets_by_spec_name = { @orangeframework_pod_target.name => [@monkey_pod_target] }
-          @pod_target.test_app_hosts_by_spec_name = { @orangeframework_pod_target.name => [@matryoshka_pod_target.specs.first,
-                                                                                           @matryoshka_pod_target] }
+          @pod_target.test_app_hosts_by_spec = {
+            fixture_spec('orange-framework/OrangeFramework.podspec') => [@matryoshka_pod_target.specs.first, @matryoshka_pod_target],
+          }
         end
 
         it 'resolves simple dependencies' do
@@ -686,10 +699,18 @@ module Pod
         end
 
         it 'scopes test app host dependencies' do
-          scoped_pod_target = @pod_target.scoped
-          scoped_pod_target.first.test_app_hosts_by_spec_name.count.should == 1
-          scoped_pod_target.first.test_app_hosts_by_spec_name['OrangeFramework'].first.should == @matryoshka_pod_target.specs.first
-          scoped_pod_target.first.test_app_hosts_by_spec_name['OrangeFramework'].last.name.should == 'matryoshka-Pods'
+          scoped_pod_target = @pod_target.scoped.first
+          scoped_pod_target.test_app_hosts_by_spec.count.should == 1
+          scoped_pod_target.test_app_hosts_by_spec[@orangeframework_pod_target.root_spec].first.should == @matryoshka_pod_target.specs.first
+          scoped_pod_target.test_app_hosts_by_spec[@orangeframework_pod_target.root_spec].last.name.should == 'matryoshka-Pods'
+        end
+
+        it 'responds to #test_app_hosts_by_name for compatibility' do
+          # TODO: Remove in 2.0
+          scoped_pod_target = @pod_target.scoped.first
+          scoped_pod_target.test_app_hosts_by_spec_name.count.should == 1
+          scoped_pod_target.test_app_hosts_by_spec_name[@orangeframework_pod_target.root_spec.name].first.should == @matryoshka_pod_target.specs.first
+          scoped_pod_target.test_app_hosts_by_spec_name[@orangeframework_pod_target.root_spec.name].last.name.should == 'matryoshka-Pods'
         end
 
         describe 'With cyclic dependencies' do
@@ -848,8 +869,7 @@ module Pod
                                       '${PODS_CONFIGURATION_BUILD_DIR}/WatermelonLibTestResources.bundle'],
             'WatermelonLib/UITests' => [],
             'WatermelonLib/SnapshotTests' => [],
-            'WatermelonLib/App' => ['${PODS_ROOT}/../../spec/fixtures/watermelon-lib/App/resource.txt',
-                                    '${PODS_CONFIGURATION_BUILD_DIR}/WatermelonLib/WatermelonLibExampleAppResources.bundle'],
+            'WatermelonLib/App' => ['${PODS_CONFIGURATION_BUILD_DIR}/WatermelonLib/WatermelonLibExampleAppResources.bundle'],
           }
         end
 
@@ -935,7 +955,7 @@ module Pod
                                                                [target_definition])
           app_host_spec = pineapple_pod_target.app_specs.find { |t| t.base_name == 'App' }
           test_spec = pineapple_pod_target.test_specs.find { |t| t.base_name == 'Tests' }
-          pineapple_pod_target.test_app_hosts_by_spec_name = { 'PineappleLib/Tests' => [app_host_spec, pineapple_pod_target] }
+          pineapple_pod_target.test_app_hosts_by_spec = { pineapple_spec.subspec_by_name('PineappleLib/Tests', true, true) => [app_host_spec, pineapple_pod_target] }
           pineapple_pod_target.app_host_dependent_targets_for_spec(test_spec).map(&:name).should == ['PineappleLib']
         end
 
@@ -947,7 +967,7 @@ module Pod
                                                                [target_definition])
           app_host_spec = pineapple_pod_target.app_specs.find { |t| t.base_name == 'App' }
           test_spec = pineapple_pod_target.test_specs.find { |t| t.base_name == 'UI' }
-          pineapple_pod_target.test_app_hosts_by_spec_name = { 'PineappleLib/UI' => [app_host_spec, pineapple_pod_target] }
+          pineapple_pod_target.test_app_hosts_by_spec = { pineapple_spec.subspec_by_name('PineappleLib/UI', true, true) => [app_host_spec, pineapple_pod_target] }
           pineapple_pod_target.app_host_dependent_targets_for_spec(test_spec).map(&:name).should == []
         end
 
@@ -959,6 +979,67 @@ module Pod
                                                                [target_definition])
           app_host_spec = pineapple_pod_target.app_specs.find { |t| t.base_name == 'App' }
           pineapple_pod_target.app_host_dependent_targets_for_spec(app_host_spec).map(&:name).should == []
+        end
+      end
+    end
+
+    describe 'script phases' do
+      before do
+        @watermelon_spec = fixture_spec('watermelon-lib/WatermelonLib.podspec')
+        @watermelon_test_spec = @watermelon_spec.test_specs.first
+        @test_spec_target_definition = fixture_target_definition('Pods')
+        @test_pod_target = fixture_pod_target_with_specs([@watermelon_spec, *@watermelon_spec.recursive_subspecs],
+                                                         true, {}, [], Platform.new(:ios, '6.0'),
+                                                         [@test_spec_target_definition])
+      end
+      describe 'embed frameworks for test & app specs' do
+        it 'returns the relative path to the script' do
+          path = @test_pod_target.embed_frameworks_script_path_for_spec(@watermelon_test_spec)
+          path.should == @test_pod_target.support_files_dir + 'WatermelonLib-Unit-Tests-frameworks.sh'
+        end
+
+        it 'returns the correct input files file list path' do
+          path = @test_pod_target.embed_frameworks_script_input_files_path_for_spec(@watermelon_test_spec)
+          path.should == @test_pod_target.support_files_dir + 'WatermelonLib-Unit-Tests-frameworks-input-files.xcfilelist'
+        end
+
+        it 'returns the correct output files file list path' do
+          path = @test_pod_target.embed_frameworks_script_output_files_path_for_spec(@watermelon_test_spec)
+          path.should == @test_pod_target.support_files_dir + 'WatermelonLib-Unit-Tests-frameworks-output-files.xcfilelist'
+        end
+      end
+
+      describe 'copy xframeworks' do
+        it 'returns the relative path to the script' do
+          path = @pod_target.copy_xcframeworks_script_path
+          path.should == @pod_target.support_files_dir + 'BananaLib-xcframeworks.sh'
+        end
+
+        it 'returns the correct input files file list path' do
+          path = @pod_target.copy_xcframeworks_script_input_files_path
+          path.should == @pod_target.support_files_dir + 'BananaLib-xcframeworks-input-files.xcfilelist'
+        end
+
+        it 'returns the correct output files file list path' do
+          path = @pod_target.copy_xcframeworks_script_output_files_path
+          path.should == @pod_target.support_files_dir + 'BananaLib-xcframeworks-output-files.xcfilelist'
+        end
+      end
+
+      describe 'copy dSYMs' do
+        it 'returns the relative path to the script' do
+          path = @pod_target.copy_dsyms_script_path
+          path.should == @pod_target.support_files_dir + 'BananaLib-copy-dsyms.sh'
+        end
+
+        it 'returns the correct input files file list path' do
+          path = @pod_target.copy_dsyms_script_input_files_path
+          path.should == @pod_target.support_files_dir + 'BananaLib-copy-dsyms-input-files.xcfilelist'
+        end
+
+        it 'returns the correct output files file list path' do
+          path = @pod_target.copy_dsyms_script_output_files_path
+          path.should == @pod_target.support_files_dir + 'BananaLib-copy-dsyms-output-files.xcfilelist'
         end
       end
     end

@@ -34,6 +34,8 @@ module Pod
     autoload :InstallationOptions,          'cocoapods/installer/installation_options'
     autoload :PostInstallHooksContext,      'cocoapods/installer/post_install_hooks_context'
     autoload :PreInstallHooksContext,       'cocoapods/installer/pre_install_hooks_context'
+    autoload :BaseInstallHooksContext,      'cocoapods/installer/base_install_hooks_context'
+    autoload :PostIntegrateHooksContext,    'cocoapods/installer/post_integrate_hooks_context'
     autoload :SourceProviderHooksContext,   'cocoapods/installer/source_provider_hooks_context'
     autoload :PodfileValidator,             'cocoapods/installer/podfile_validator'
     autoload :PodSourceInstaller,           'cocoapods/installer/pod_source_installer'
@@ -46,6 +48,8 @@ module Pod
     autoload :TargetUUIDGenerator,          'cocoapods/installer/target_uuid_generator'
 
     include Config::Mixin
+
+    MASTER_SPECS_REPO_GIT_URL = 'https://github.com/CocoaPods/Specs.git'.freeze
 
     # @return [Sandbox] The sandbox where the Pods should be installed.
     #
@@ -195,7 +199,7 @@ module Pod
 
           force_clean_install = clean_install || project_cache_version.version != Version.create(VersionMetadata.project_cache_version)
           cache_result = ProjectCache::ProjectCacheAnalyzer.new(sandbox, installation_cache, analysis_result.all_user_build_configurations,
-                                                                object_version, plugins, pod_targets, aggregate_targets, :clean_install => force_clean_install).analyze
+                                                                object_version, plugins, pod_targets, aggregate_targets, installation_options.to_h, :clean_install => force_clean_install).analyze
           aggregate_targets_to_generate = cache_result.aggregate_targets_to_generate || []
           pod_targets_to_generate = cache_result.pod_targets_to_generate
           (aggregate_targets_to_generate + pod_targets_to_generate).each do |target|
@@ -331,7 +335,7 @@ module Pod
         all_projects_by_pod_targets.merge!(pods_project_by_targets) if pods_project_by_targets
         all_projects_by_pod_targets.merge!(projects_by_pod_targets) if projects_by_pod_targets
         all_projects_by_pod_targets.each do |project, pod_targets|
-          generator.configure_schemes(project, pod_targets)
+          generator.configure_schemes(project, pod_targets, pod_project_generation_result)
         end
       end
     end
@@ -494,7 +498,7 @@ module Pod
             previous_version = sandbox.manifest.version(spec.name)
             has_changed_version = current_version != previous_version
             current_repo = analysis_result.specs_by_source.detect { |key, values| break key if values.map(&:name).include?(spec.name) }
-            current_repo &&= current_repo.url || current_repo.name
+            current_repo &&= (Pod::TrunkSource::TRUNK_REPO_NAME if current_repo.name == Pod::TrunkSource::TRUNK_REPO_NAME) || current_repo.url || current_repo.name
             previous_spec_repo = sandbox.manifest.spec_repo(spec.name)
             has_changed_repo = !previous_spec_repo.nil? && current_repo && !current_repo.casecmp(previous_spec_repo).zero?
             title = "Installing #{spec.name} #{spec.version}"
@@ -563,6 +567,7 @@ module Pod
     #
     def clean_pod_sources
       return unless installation_options.clean?
+      return if installed_specs.empty?
       pod_installers.each(&:clean!)
     end
 
@@ -607,6 +612,7 @@ module Pod
       run_plugins_post_install_hooks
       warn_for_deprecations
       warn_for_installed_script_phases
+      warn_for_removing_git_master_specs_repo
       print_post_install_message
     end
 
@@ -635,10 +641,25 @@ module Pod
       lock_pod_sources
     end
 
+    # Runs the registered callbacks for the plugins post integrate hooks.
+    #
+    def run_plugins_post_integrate_hooks
+      if any_plugin_post_integrate_hooks?
+        context = PostIntegrateHooksContext.generate(sandbox, pods_project, aggregate_targets)
+        HooksManager.run(:post_integrate, context, plugins)
+      end
+    end
+
     # @return [Boolean] whether there are any plugin post-install hooks to run
     #
     def any_plugin_post_install_hooks?
       HooksManager.hooks_to_run(:post_install, plugins).any?
+    end
+
+    # @return [Boolean] whether there are any plugin post-integrate hooks to run
+    #
+    def any_plugin_post_integrate_hooks?
+      HooksManager.hooks_to_run(:post_integrate, plugins).any?
     end
 
     # Runs the registered callbacks for the source provider plugin hooks.
@@ -686,7 +707,7 @@ module Pod
       end
     end
 
-    DEFAULT_PLUGINS = { 'cocoapods-stats' => {} }
+    DEFAULT_PLUGINS = {}
 
     # Returns the plugins that should be run, as indicated by the default
     # plugins and the podfile's plugins
@@ -726,13 +747,31 @@ module Pod
     def warn_for_installed_script_phases
       pods_to_install = sandbox_state.added | sandbox_state.changed
       pod_targets.group_by(&:pod_name).each do |name, pod_targets|
-        if pods_to_install.include?(name)
+        if pods_to_install.include?(name) && !sandbox.local?(name)
           script_phase_count = pod_targets.inject(0) { |sum, target| sum + target.script_phases.count }
           unless script_phase_count.zero?
             UI.warn "#{name} has added #{script_phase_count} #{'script phase'.pluralize(script_phase_count)}. " \
               'Please inspect before executing a build. See `https://guides.cocoapods.org/syntax/podspec.html#script_phases` for more information.'
           end
         end
+      end
+    end
+
+    # Prints a warning if the project is not explicitly using the git based master specs repo.
+    #
+    # Helps users to delete the git based master specs repo from the repos directory which reduces `--repo-update`
+    # speed and hopefully reduces Github workload.
+    #
+    # @return [void]
+    #
+    def warn_for_removing_git_master_specs_repo
+      return unless installation_options.warn_for_unused_master_specs_repo?
+      podfile_master_source = podfile.sources.find { |source| source == MASTER_SPECS_REPO_GIT_URL }
+      master_repo = config.sources_manager.all.find { |s| s.url == MASTER_SPECS_REPO_GIT_URL }
+      if podfile_master_source.nil? && !master_repo.nil?
+        UI.warn 'Your project does not explicitly specify the CocoaPods master specs repo. Since CDN is now used as the' \
+        ' default, you may safely remove it from your repos directory via `pod repo remove master`. To suppress this warning' \
+        ' please add `warn_for_unused_master_specs_repo => false` to your Podfile.'
       end
     end
 
@@ -776,6 +815,7 @@ module Pod
       installation_cache.update_project_object_version!(cache_analysis_result.project_object_version)
       installation_cache.update_build_configurations!(cache_analysis_result.build_configurations)
       installation_cache.update_podfile_plugins!(plugins)
+      installation_cache.update_installation_options!(installation_options.to_h)
       installation_cache.save_as(sandbox.project_installation_cache_path)
 
       metadata_cache.update_metadata!(target_installation_results.pod_target_installation_results || {},
@@ -799,6 +839,7 @@ module Pod
         integrator = UserProjectIntegrator.new(podfile, sandbox, installation_root, aggregate_targets, generated_aggregate_targets,
                                                :use_input_output_paths => !installation_options.disable_input_output_paths?)
         integrator.integrate!
+        run_podfile_post_integrate_hooks
       end
     end
 
@@ -861,6 +902,33 @@ module Pod
         "\n\n#{e.message}\n\n#{e.backtrace * "\n"}"
     end
 
+    # Runs the post integrate hooks of the installed specs and of the Podfile.
+    #
+    # @note   Post integrate hooks run _after_ saving of project, so that they
+    #         can alter it after it is written to the disk.
+    #
+    # @return [void]
+    #
+    def run_podfile_post_integrate_hooks
+      UI.message '- Running post integrate hooks' do
+        executed = run_podfile_post_integrate_hook
+        UI.message '- Podfile' if executed
+      end
+    end
+
+    # Runs the post integrate hook of the Podfile.
+    #
+    # @raise  Raises an informative if the hooks raises.
+    #
+    # @return [Boolean] Whether the hook was run.
+    #
+    def run_podfile_post_integrate_hook
+      podfile.post_integrate!(self)
+    rescue => e
+      raise Informative, 'An error occurred while processing the post-integrate ' \
+        'hook of the Podfile.' \
+        "\n\n#{e.message}\n\n#{e.backtrace * "\n"}"
+    end
     #-------------------------------------------------------------------------#
 
     public

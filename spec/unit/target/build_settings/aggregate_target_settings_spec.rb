@@ -220,6 +220,11 @@ module Pod
                             :weak_frameworks => [],
                             :spec => spec,
                            )
+            xcframework = stub('xcframework',
+                               :name => 'VendoredXCFramework',
+                               :build_type => BuildType.static_library,
+                               :slices => [stub('slice', :binary_path => Pathname.new('/tmp/path/to/libVendoredXCFramework.a'))],
+                              )
             file_accessor = stub('file_accessor',
                                  :spec => spec,
                                  :spec_consumer => consumer,
@@ -227,7 +232,7 @@ module Pod
                                  :vendored_static_libraries => [config.sandbox.root + 'StaticLibrary.a'],
                                  :vendored_dynamic_frameworks => [config.sandbox.root + 'VendoredFramework.framework'],
                                  :vendored_dynamic_libraries => [config.sandbox.root + 'VendoredDyld.dyld'],
-                                 :vendored_xcframeworks => [],
+                                 :vendored_xcframeworks => [config.sandbox.root + 'VendoredXCFramework.xcframework'],
                                 )
             file_accessor.stubs(:vendored_frameworks => file_accessor.vendored_static_frameworks + file_accessor.vendored_dynamic_frameworks,
                                 :vendored_dynamic_artifacts => file_accessor.vendored_dynamic_frameworks + file_accessor.vendored_dynamic_libraries)
@@ -253,10 +258,22 @@ module Pod
                               :target_definitions => [target_definition],
                               :root_spec => spec,
                              )
-            pod_target.stubs(:build_settings_for_spec => PodTargetSettings.new(pod_target, nil, :configuration => :release))
+            pod_target_settings = PodTargetSettings.new(pod_target, nil, :configuration => :release)
+            pod_target_settings.stubs(:load_xcframework).returns(xcframework)
+            pod_target.stubs(:build_settings_for_spec => pod_target_settings)
             aggregate_target = fixture_aggregate_target([pod_target])
             @generator = AggregateTargetSettings.new(aggregate_target, 'Release', :configuration => :release)
-            @generator.other_ldflags.should == %w(-ObjC -l"PodTarget" -l"StaticLibrary" -l"VendoredDyld" -l"xml2" -framework "StaticFramework" -framework "VendoredFramework" -framework "XCTest")
+            @generator.other_ldflags.should == %w(
+              -ObjC
+              -l"PodTarget"
+              -l"StaticLibrary"
+              -l"VendoredDyld"
+              -l"VendoredXCFramework"
+              -l"xml2"
+              -framework "StaticFramework"
+              -framework "VendoredFramework"
+              -framework "XCTest"
+            )
           end
         end
 
@@ -382,12 +399,12 @@ module Pod
 
           it 'includes default runpath search path list for a non host target' do
             @target.stubs(:requires_host_target?).returns(false)
-            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) '@executable_path/Frameworks' '@loader_path/Frameworks'"
+            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) /usr/lib/swift '@executable_path/Frameworks' '@loader_path/Frameworks'"
           end
 
           it 'includes default runpath search path list for a host target' do
             @target.stubs(:requires_host_target?).returns(true)
-            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) '@executable_path/Frameworks' '@loader_path/Frameworks' '@executable_path/../../Frameworks'"
+            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) /usr/lib/swift '@executable_path/Frameworks' '@loader_path/Frameworks' '@executable_path/../../Frameworks'"
           end
 
           it 'includes correct default runpath search path list for OSX unit test bundle user target' do
@@ -395,7 +412,7 @@ module Pod
             mock_user_target = mock('usertarget')
             mock_user_target.stubs(:symbol_type).returns(:unit_test_bundle)
             @target.stubs(:user_targets).returns([mock_user_target])
-            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) '@executable_path/../Frameworks' '@loader_path/../Frameworks'"
+            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == %q[$(inherited) /usr/lib/swift "$(PLATFORM_DIR)/Developer/Library/Frameworks" '@executable_path/../Frameworks' '@loader_path/../Frameworks' "${DT_TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME}"]
           end
 
           it 'includes correct default runpath search path list for OSX application user target' do
@@ -403,7 +420,7 @@ module Pod
             mock_user_target = mock('usertarget')
             mock_user_target.stubs(:symbol_type).returns(:application)
             @target.stubs(:user_targets).returns([mock_user_target])
-            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == "$(inherited) '@executable_path/../Frameworks' '@loader_path/Frameworks'"
+            @generator.generate.to_hash['LD_RUNPATH_SEARCH_PATHS'].should == %q[$(inherited) /usr/lib/swift '@executable_path/../Frameworks' '@loader_path/Frameworks' "${DT_TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME}"]
           end
 
           it 'uses the target definition swift version' do
