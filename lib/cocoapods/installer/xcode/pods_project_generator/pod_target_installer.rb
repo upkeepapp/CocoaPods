@@ -195,10 +195,6 @@ module Pod
             specs.any? { |spec| spec.module_map.is_a?(FalseClass) }
           end
 
-          def skip_modulemap?(specs)
-            specs.any? { |spec| spec.module_map.is_a?(FalseClass) }
-          end
-
           # True if info.plist generation should be skipped
           #
           # @param [PXNativeTarget] native_target
