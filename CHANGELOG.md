@@ -41,6 +41,10 @@ To install release candidates run `[sudo] gem install cocoapods --pre`
   regenerated.  
   [Samuel Giddins](https://github.com/segiddins)
 
+  * Add possibility to skip modulemap generation
+  [till0xff](https://github.com/till0xff)
+  [#10235](https://github.com/CocoaPods/CocoaPods/issues/10235)
+
 
 ## 1.10.0.beta.2 (2020-08-12)
 
